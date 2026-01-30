@@ -37,16 +37,23 @@ function LoanListCard({
 
   return (
     <TouchableOpacity
-      style={styles.loanCard}
+      style={[styles.loanCard, { backgroundColor: color + '15' }]}
       onPress={() => router.push(`/(main)/loans/${id}`)}
       activeOpacity={0.7}
     >
       <View style={[styles.loanCardBorder, { backgroundColor: color }]} />
       <View style={styles.loanCardContent}>
         <View style={styles.loanCardHeader}>
-          <View>
-            <Text style={styles.loanCardName}>{borrowerName}</Text>
-            <Text style={styles.loanCardDue}>{dueInfo}</Text>
+          <View style={styles.loanCardHeaderLeft}>
+            <View style={[styles.avatarCircle, { backgroundColor: color }]}>
+              <Text style={styles.avatarText}>
+                {borrowerName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <View>
+              <Text style={styles.loanCardName}>{borrowerName}</Text>
+              <Text style={styles.loanCardDue}>{dueInfo}</Text>
+            </View>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColors[status] + '20' }]}>
             <Text style={[styles.statusText, { color: statusColors[status] }]}>
@@ -56,7 +63,7 @@ function LoanListCard({
         </View>
         <View style={styles.loanCardFooter}>
           <Text style={styles.loanCardAmount}>{amount}</Text>
-          <Text style={styles.loanCardArrow}>→</Text>
+          <Text style={[styles.loanCardArrow, { color: color }]}>→</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -69,6 +76,7 @@ interface LoanWithBorrower {
   total_amount: number;
   status: 'active' | 'completed' | 'defaulted' | 'cancelled';
   color_code: string;
+  currency: 'ARS' | 'USD';
   first_payment_date: string;
   borrower: Borrower | null;
 }
@@ -124,7 +132,14 @@ export default function LoansScreen() {
     return true;
   });
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, currency: 'ARS' | 'USD' = 'ARS') => {
+    if (currency === 'USD') {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+      }).format(amount);
+    }
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
       currency: 'ARS',
@@ -251,7 +266,7 @@ export default function LoansScreen() {
               key={loan.id}
               id={loan.id}
               borrowerName={loan.borrower?.full_name || 'Sin nombre'}
-              amount={formatCurrency(loan.total_amount)}
+              amount={formatCurrency(loan.total_amount, loan.currency || 'ARS')}
               dueInfo={getDueInfo(loan)}
               status={getLoanStatus(loan)}
               color={loan.color_code || colors.primary.main}
@@ -425,6 +440,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: spacing.sm,
+  },
+  loanCardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  avatarCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: colors.text.inverse,
   },
   loanCardName: {
     fontSize: fontSize.base,

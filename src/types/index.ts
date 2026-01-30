@@ -18,6 +18,9 @@ export type InterestType = 'simple' | 'french';
 // Tipo de penalización por mora
 export type LatePenaltyType = 'none' | 'fixed' | 'daily' | 'weekly';
 
+// Tipo de moneda
+export type CurrencyType = 'ARS' | 'USD';
+
 // Tipo para cálculo de préstamo
 export interface LoanCalculationInput {
   principalAmount: number;

@@ -1,8 +1,16 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useAuthStore } from '../../../store';
+import { useAuthStore, usePreferencesStore } from '../../../store';
+import { Modal } from '../../../components';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
+import { CurrencyType } from '../../../types';
+
+// Información de contacto de soporte
+const SUPPORT_EMAIL = 'soporte@cuotify.app';
+const SUPPORT_WHATSAPP = '+5491112345678'; // Cambiar por el número real
+const APP_VERSION = '1.0.0';
 
 function SettingsItem({
   icon,
@@ -41,23 +49,41 @@ function SettingsItem({
 
 export default function SettingsScreen() {
   const { profile, signOut } = useAuthStore();
+  const { defaultCurrency, setDefaultCurrency } = usePreferencesStore();
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Estás seguro que deseas cerrar sesión?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Cerrar sesión',
-          style: 'destructive',
-          onPress: async () => {
-            await signOut();
-            router.replace('/(auth)/login');
-          },
-        },
-      ]
-    );
+  // Estados de modales
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [showFAQModal, setShowFAQModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showRateModal, setShowRateModal] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [showThanksModal, setShowThanksModal] = useState(false);
+
+  const handleLogout = async () => {
+    setShowLogoutModal(false);
+    await signOut();
+    router.replace('/(auth)/login');
+  };
+
+  const handleContactEmail = () => {
+    setShowContactModal(false);
+    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Soporte Cuotify&body=Hola, necesito ayuda con...`);
+  };
+
+  const handleContactWhatsApp = () => {
+    setShowContactModal(false);
+    Linking.openURL(`https://wa.me/${SUPPORT_WHATSAPP}?text=Hola, necesito ayuda con la app Cuotify`);
+  };
+
+  const handleRateApp = () => {
+    setShowRateModal(false);
+    setShowThanksModal(true);
+    // TODO: Reemplazar con links reales cuando se publique
+    // Para Android: Linking.openURL('market://details?id=com.cuotify.app')
+    // Para iOS: Linking.openURL('itms-apps://itunes.apple.com/app/idXXXXXXXXX?action=write-review')
   };
 
   const roleLabel = {
@@ -126,13 +152,13 @@ export default function SettingsScreen() {
             icon="🌐"
             title="Idioma"
             subtitle="Español"
-            onPress={() => Alert.alert('Idioma', 'Actualmente solo disponible en español')}
+            onPress={() => setShowLanguageModal(true)}
           />
           <SettingsItem
             icon="💱"
-            title="Moneda"
-            subtitle="USD ($)"
-            onPress={() => Alert.alert('Próximamente', 'Esta función estará disponible pronto')}
+            title="Moneda por defecto"
+            subtitle={defaultCurrency === 'ARS' ? '🇦🇷 Pesos (ARS)' : '🇺🇸 Dólares (USD)'}
+            onPress={() => setShowCurrencyModal(true)}
           />
         </View>
 
@@ -141,19 +167,31 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <SettingsItem
             icon="❓"
-            title="Ayuda"
-            subtitle="Preguntas frecuentes"
-            onPress={() => Alert.alert('Ayuda', 'Contacta soporte@cuotify.app')}
+            title="Preguntas frecuentes"
+            subtitle="Ayuda y respuestas rápidas"
+            onPress={() => setShowFAQModal(true)}
+          />
+          <SettingsItem
+            icon="💬"
+            title="Contactar soporte"
+            subtitle="Email o WhatsApp"
+            onPress={() => setShowContactModal(true)}
+          />
+          <SettingsItem
+            icon="⭐"
+            title="Calificar la app"
+            subtitle="¡Tu opinión nos ayuda!"
+            onPress={() => setShowRateModal(true)}
           />
           <SettingsItem
             icon="📄"
             title="Términos y condiciones"
-            onPress={() => Alert.alert('Términos', 'Próximamente')}
+            onPress={() => setShowTermsModal(true)}
           />
           <SettingsItem
             icon="🔐"
             title="Política de privacidad"
-            onPress={() => Alert.alert('Privacidad', 'Próximamente')}
+            onPress={() => setShowPrivacyModal(true)}
           />
         </View>
 
@@ -162,17 +200,202 @@ export default function SettingsScreen() {
           <SettingsItem
             icon="🚪"
             title="Cerrar sesión"
-            onPress={handleLogout}
+            onPress={() => setShowLogoutModal(true)}
             showArrow={false}
             danger
           />
         </View>
 
         {/* Versión */}
-        <Text style={styles.version}>Cuotify v1.0.0</Text>
+        <Text style={styles.version}>Cuotify v{APP_VERSION}</Text>
 
         <View style={{ height: spacing.xl }} />
       </ScrollView>
+
+      {/* Modal de Moneda */}
+      <Modal
+        visible={showCurrencyModal}
+        onClose={() => setShowCurrencyModal(false)}
+        title="Moneda por defecto"
+        message="Selecciona la moneda que se usará por defecto al crear nuevos préstamos"
+        icon="💱"
+        accentColor={colors.primary.main}
+        buttons={[
+          {
+            text: '🇦🇷  Pesos (ARS)',
+            style: defaultCurrency === 'ARS' ? 'primary' : 'default',
+            onPress: () => {
+              setDefaultCurrency('ARS' as CurrencyType);
+              setShowCurrencyModal(false);
+            },
+          },
+          {
+            text: '🇺🇸  Dólares (USD)',
+            style: defaultCurrency === 'USD' ? 'primary' : 'default',
+            onPress: () => {
+              setDefaultCurrency('USD' as CurrencyType);
+              setShowCurrencyModal(false);
+            },
+          },
+          { text: 'Cancelar', style: 'cancel' },
+        ]}
+      />
+
+      {/* Modal de Idioma */}
+      <Modal
+        visible={showLanguageModal}
+        onClose={() => setShowLanguageModal(false)}
+        title="Idioma"
+        message="Actualmente Cuotify solo está disponible en español. Próximamente agregaremos más idiomas."
+        icon="🌐"
+        accentColor={colors.secondary.main}
+        buttons={[{ text: 'Entendido', style: 'primary' }]}
+      />
+
+      {/* Modal de Cerrar Sesión */}
+      <Modal
+        visible={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        title="Cerrar sesión"
+        message="¿Estás seguro que deseas cerrar sesión? Tendrás que volver a iniciar sesión para acceder a tu cuenta."
+        icon="🚪"
+        accentColor={colors.error}
+        buttons={[
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Cerrar sesión', style: 'destructive', onPress: handleLogout },
+        ]}
+      />
+
+      {/* Modal de Contacto */}
+      <Modal
+        visible={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        title="Contactar Soporte"
+        message="¿Cómo prefieres contactarnos? Estamos aquí para ayudarte."
+        icon="💬"
+        accentColor={colors.success}
+        buttons={[
+          { text: '📧  Enviar Email', style: 'default', onPress: handleContactEmail },
+          { text: '💚  WhatsApp', style: 'primary', onPress: handleContactWhatsApp },
+          { text: 'Cancelar', style: 'cancel' },
+        ]}
+      />
+
+      {/* Modal de FAQ */}
+      <Modal
+        visible={showFAQModal}
+        onClose={() => setShowFAQModal(false)}
+        title="Preguntas Frecuentes"
+        icon="❓"
+        accentColor={colors.warning}
+        message={`📌 ¿Cómo creo un préstamo?
+Ve a Préstamos → + Nuevo y completa los datos del prestatario y las condiciones del préstamo.
+
+📌 ¿Cómo registro un pago?
+Entra al préstamo, selecciona la cuota y toca "Marcar como pagado".
+
+📌 ¿Puedo prestar en dólares?
+Sí, al crear el préstamo puedes elegir entre Pesos (ARS) o Dólares (USD).
+
+📌 ¿Cómo funcionan las notificaciones?
+Recibirás recordatorios automáticos antes del vencimiento de cada cuota.
+
+📌 ¿Es segura mi información?
+Sí, usamos encriptación y tus datos están protegidos en servidores seguros.
+
+¿Necesitas más ayuda? Contáctanos.`}
+        buttons={[
+          { text: 'Contactar Soporte', style: 'primary', onPress: () => {
+            setShowFAQModal(false);
+            setShowContactModal(true);
+          }},
+          { text: 'Cerrar', style: 'cancel' },
+        ]}
+      />
+
+      {/* Modal de Términos */}
+      <Modal
+        visible={showTermsModal}
+        onClose={() => setShowTermsModal(false)}
+        title="Términos y Condiciones"
+        icon="📄"
+        accentColor={colors.primary.main}
+        message={`TÉRMINOS DE USO DE CUOTIFY
+
+1. ACEPTACIÓN
+Al usar Cuotify, aceptas estos términos de uso.
+
+2. USO DE LA APLICACIÓN
+Cuotify es una herramienta para gestionar préstamos personales. El usuario es responsable de cumplir con las leyes locales sobre préstamos.
+
+3. PRIVACIDAD
+Protegemos tu información personal. No compartimos tus datos con terceros sin tu consentimiento.
+
+4. RESPONSABILIDAD
+Cuotify es una herramienta de gestión. No somos responsables de los acuerdos entre prestamistas y prestatarios.
+
+5. MODIFICACIONES
+Podemos actualizar estos términos. Te notificaremos de cambios importantes.
+
+Última actualización: Enero 2025`}
+        buttons={[{ text: 'Entendido', style: 'primary' }]}
+      />
+
+      {/* Modal de Privacidad */}
+      <Modal
+        visible={showPrivacyModal}
+        onClose={() => setShowPrivacyModal(false)}
+        title="Política de Privacidad"
+        icon="🔐"
+        accentColor={colors.secondary.main}
+        message={`POLÍTICA DE PRIVACIDAD DE CUOTIFY
+
+📱 DATOS QUE RECOPILAMOS
+• Información de cuenta (email, nombre)
+• Datos de préstamos que creas
+• Información de dispositivo para notificaciones
+
+🔒 CÓMO PROTEGEMOS TUS DATOS
+• Encriptación de extremo a extremo
+• Servidores seguros con certificación
+• Acceso restringido a tu información
+
+🚫 LO QUE NO HACEMOS
+• No vendemos tus datos
+• No compartimos información con terceros
+• No accedemos a tus contactos sin permiso
+
+📧 CONTACTO
+Para consultas sobre privacidad: ${SUPPORT_EMAIL}
+
+Última actualización: Enero 2025`}
+        buttons={[{ text: 'Entendido', style: 'primary' }]}
+      />
+
+      {/* Modal de Calificar */}
+      <Modal
+        visible={showRateModal}
+        onClose={() => setShowRateModal(false)}
+        title="¿Te gusta Cuotify?"
+        message="Tu opinión nos ayuda a mejorar. ¿Te gustaría calificarnos en la tienda de apps?"
+        icon="⭐"
+        accentColor={colors.warning}
+        buttons={[
+          { text: 'Ahora no', style: 'cancel' },
+          { text: '⭐ Calificar', style: 'primary', onPress: handleRateApp },
+        ]}
+      />
+
+      {/* Modal de Gracias */}
+      <Modal
+        visible={showThanksModal}
+        onClose={() => setShowThanksModal(false)}
+        title="¡Gracias!"
+        message="¡Pronto podrás calificarnos en las tiendas de apps! Tu apoyo significa mucho para nosotros."
+        icon="💜"
+        accentColor={colors.primary.main}
+        buttons={[{ text: 'De nada', style: 'primary' }]}
+      />
     </SafeAreaView>
   );
 }

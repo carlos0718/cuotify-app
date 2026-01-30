@@ -19,13 +19,18 @@ export const colors = {
   error: '#EF4444',
   info: '#3B82F6',
 
-  // Colores para tarjetas de préstamos
+  // Colores para tarjetas de préstamos (pasteles suaves)
   loanColors: [
-    '#6366F1', // Índigo
-    '#8B5CF6', // Púrpura
-    '#EC4899', // Rosa
-    '#14B8A6', // Turquesa
-    '#F97316', // Naranja
+    '#A5B4FC', // Índigo pastel
+    '#C4B5FD', // Púrpura pastel
+    '#F9A8D4', // Rosa pastel
+    '#99F6E4', // Turquesa pastel
+    '#FED7AA', // Naranja pastel
+    '#A7F3D0', // Verde menta pastel
+    '#FDE68A', // Amarillo pastel
+    '#FBCFE8', // Pink pastel
+    '#BAE6FD', // Celeste pastel
+    '#DDD6FE', // Lavanda pastel
   ],
 
   // Neutros

@@ -27,6 +27,66 @@ export async function getBorrowers(): Promise<Borrower[]> {
   return (data || []) as Borrower[];
 }
 
+/**
+ * Busca un prestatario existente por DNI
+ */
+export async function findBorrowerByDni(lenderId: string, dni: string): Promise<Borrower | null> {
+  if (!dni || dni.trim() === '') return null;
+
+  const { data, error } = await supabase
+    .from('borrowers')
+    .select('*')
+    .eq('lender_id', lenderId)
+    .eq('dni', dni.trim())
+    .maybeSingle();
+
+  if (error) throw new Error(handleSupabaseError(error));
+  return data as Borrower | null;
+}
+
+/**
+ * Busca un prestatario existente por teléfono
+ */
+export async function findBorrowerByPhone(lenderId: string, phone: string): Promise<Borrower | null> {
+  if (!phone || phone.trim() === '') return null;
+
+  const { data, error } = await supabase
+    .from('borrowers')
+    .select('*')
+    .eq('lender_id', lenderId)
+    .eq('phone', phone.trim())
+    .maybeSingle();
+
+  if (error) throw new Error(handleSupabaseError(error));
+  return data as Borrower | null;
+}
+
+/**
+ * Obtiene un prestatario existente o crea uno nuevo
+ * Busca primero por DNI, luego por teléfono
+ */
+export async function getOrCreateBorrower(data: BorrowerInsert): Promise<{ borrower: Borrower; isNew: boolean }> {
+  // 1. Buscar por DNI si existe
+  if (data.dni) {
+    const existingByDni = await findBorrowerByDni(data.lender_id, data.dni);
+    if (existingByDni) {
+      return { borrower: existingByDni, isNew: false };
+    }
+  }
+
+  // 2. Buscar por teléfono si existe
+  if (data.phone) {
+    const existingByPhone = await findBorrowerByPhone(data.lender_id, data.phone);
+    if (existingByPhone) {
+      return { borrower: existingByPhone, isNew: false };
+    }
+  }
+
+  // 3. Crear nuevo prestatario
+  const newBorrower = await createBorrower(data);
+  return { borrower: newBorrower, isNew: true };
+}
+
 // =============================================
 // PRÉSTAMOS (Loans)
 // =============================================
@@ -100,7 +160,7 @@ export async function updateLoanStatus(id: string, status: Loan['status']) {
 // PAGOS (Payments)
 // =============================================
 
-export async function getPaymentsByLoan(loanId: string) {
+export async function getPaymentsByLoan(loanId: string): Promise<Payment[]> {
   const { data, error } = await supabase
     .from('payments')
     .select('*')
@@ -108,7 +168,7 @@ export async function getPaymentsByLoan(loanId: string) {
     .order('payment_number', { ascending: true });
 
   if (error) throw new Error(handleSupabaseError(error));
-  return data || [];
+  return (data || []) as Payment[];
 }
 
 export async function markPaymentAsPaid(paymentId: string, paidAmount: number) {

@@ -11,13 +11,26 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { calculateLoanPayment, calculateEndDate } from '../../../services/calculations';
-import { createBorrower, createLoan } from '../../../services/supabase';
-import { useAuthStore } from '../../../store';
+import { getOrCreateBorrower, createLoan, getPaymentsByLoan } from '../../../services/supabase';
+import { schedulePaymentReminders } from '../../../services/notifications';
+import { useAuthStore, usePreferencesStore } from '../../../store';
 import { useToast } from '../../../components';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
-import { TermType, InterestType, LatePenaltyType } from '../../../types';
+
+// Función para obtener un color aleatorio de la paleta
+const getRandomLoanColor = () => {
+  const randomIndex = Math.floor(Math.random() * colors.loanColors.length);
+  return colors.loanColors[randomIndex];
+};
+import { TermType, InterestType, LatePenaltyType, CurrencyType } from '../../../types';
 
 export default function CreateLoanScreen() {
+  // Hooks de stores primero
+  const { user } = useAuthStore();
+  const { defaultCurrency } = usePreferencesStore();
+  const { showSuccess, showError } = useToast();
+
+  // Estados
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -32,14 +45,12 @@ export default function CreateLoanScreen() {
   const [termValue, setTermValue] = useState('');
   const [termType, setTermType] = useState<TermType>('months');
   const [interestType, setInterestType] = useState<InterestType>('simple');
+  const [currency, setCurrency] = useState<CurrencyType>(defaultCurrency);
 
   // Configuración de penalización por mora
   const [latePenaltyType, setLatePenaltyType] = useState<LatePenaltyType>('none');
   const [gracePeriodDays, setGracePeriodDays] = useState('7');
   const [latePenaltyRate, setLatePenaltyRate] = useState('5');
-
-  const { user } = useAuthStore();
-  const { showSuccess, showError } = useToast();
 
   // Cálculos
   const calculatedPayment = () => {
@@ -88,8 +99,8 @@ export default function CreateLoanScreen() {
     setIsLoading(true);
 
     try {
-      // 1. Crear el prestatario
-      const borrower = await createBorrower({
+      // 1. Buscar prestatario existente o crear uno nuevo
+      const { borrower, isNew } = await getOrCreateBorrower({
         lender_id: user.id,
         full_name: borrowerName.trim(),
         dni: borrowerDni.trim() || null,
@@ -115,8 +126,9 @@ export default function CreateLoanScreen() {
         termType
       );
 
-      // 3. Crear el préstamo
-      await createLoan({
+      // 3. Crear el préstamo con color pastel aleatorio
+      const currencySymbol = currency === 'ARS' ? '$' : 'US$';
+      const newLoan = await createLoan({
         lender_id: user.id,
         borrower_id: borrower.id,
         principal_amount: parseFloat(principal),
@@ -124,6 +136,7 @@ export default function CreateLoanScreen() {
         term_value: parseInt(termValue),
         term_type: termType,
         interest_type: interestType,
+        currency: currency,
         payment_amount: payment.paymentAmount,
         total_interest: payment.totalInterest,
         total_amount: payment.totalAmount,
@@ -133,9 +146,34 @@ export default function CreateLoanScreen() {
         grace_period_days: latePenaltyType !== 'none' ? parseInt(gracePeriodDays) : 0,
         late_penalty_rate: latePenaltyType !== 'none' ? parseFloat(latePenaltyRate) : 0,
         late_penalty_type: latePenaltyType,
+        color_code: getRandomLoanColor(),
       });
 
-      showSuccess('Préstamo creado', `Préstamo de $${principal} para ${borrowerName}`);
+      // 4. Programar notificaciones de recordatorio para cada cuota
+      try {
+        const payments = await getPaymentsByLoan(newLoan.id);
+        if (payments.length > 0) {
+          await schedulePaymentReminders(
+            newLoan.id,
+            borrowerName.trim(),
+            payments.map(p => ({
+              id: p.id,
+              dueDate: p.due_date,
+              amount: p.total_amount,
+              paymentNumber: p.payment_number,
+            })),
+            newLoan.reminder_days_before || 3
+          );
+        }
+      } catch (notifError) {
+        // Si fallan las notificaciones, no bloqueamos la creación del préstamo
+        console.warn('No se pudieron programar las notificaciones:', notifError);
+      }
+
+      const message = isNew
+        ? `Préstamo de ${currencySymbol}${principal} para ${borrowerName}`
+        : `Nuevo préstamo de ${currencySymbol}${principal} agregado a ${borrowerName}`;
+      showSuccess('Préstamo creado', message);
 
       setTimeout(() => {
         router.back();
@@ -229,8 +267,49 @@ export default function CreateLoanScreen() {
           <View style={styles.form}>
             <Text style={styles.formTitle}>Detalles del Préstamo</Text>
 
+            {/* Selector de moneda */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Monto a prestar ($) *</Text>
+              <Text style={styles.label}>Moneda</Text>
+              <View style={styles.currencyContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.currencyButton,
+                    currency === 'ARS' && styles.currencyButtonActive,
+                  ]}
+                  onPress={() => setCurrency('ARS')}
+                >
+                  <Text style={styles.currencyFlag}>🇦🇷</Text>
+                  <Text
+                    style={[
+                      styles.currencyText,
+                      currency === 'ARS' && styles.currencyTextActive,
+                    ]}
+                  >
+                    Pesos (ARS)
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.currencyButton,
+                    currency === 'USD' && styles.currencyButtonActive,
+                  ]}
+                  onPress={() => setCurrency('USD')}
+                >
+                  <Text style={styles.currencyFlag}>🇺🇸</Text>
+                  <Text
+                    style={[
+                      styles.currencyText,
+                      currency === 'USD' && styles.currencyTextActive,
+                    ]}
+                  >
+                    Dólares (USD)
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Monto a prestar ({currency === 'ARS' ? '$' : 'US$'}) *</Text>
               <TextInput
                 style={styles.input}
                 placeholder="5000"
@@ -456,31 +535,31 @@ export default function CreateLoanScreen() {
             {/* Vista previa del cálculo */}
             {payment && (
               <View style={styles.preview}>
-                <Text style={styles.previewTitle}>Vista previa</Text>
+                <Text style={styles.previewTitle}>Vista previa {currency === 'USD' ? '(USD)' : '(ARS)'}</Text>
                 <View style={styles.previewRow}>
                   <Text style={styles.previewLabel}>
                     Interés {termType === 'months' ? 'mensual' : 'semanal'}:
                   </Text>
                   <Text style={styles.previewValue}>
-                    {(payment.periodicRate * 100).toFixed(2)}% (${(parseFloat(principal) * payment.periodicRate).toLocaleString('es-AR', { minimumFractionDigits: 2 })})
+                    {(payment.periodicRate * 100).toFixed(2)}% ({currency === 'ARS' ? '$' : 'US$'}{(parseFloat(principal) * payment.periodicRate).toLocaleString('es-AR', { minimumFractionDigits: 2 })})
                   </Text>
                 </View>
                 <View style={styles.previewRow}>
                   <Text style={styles.previewLabel}>Cuota:</Text>
                   <Text style={styles.previewValue}>
-                    ${payment.paymentAmount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    {currency === 'ARS' ? '$' : 'US$'}{payment.paymentAmount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                   </Text>
                 </View>
                 <View style={styles.previewRow}>
                   <Text style={styles.previewLabel}>Total intereses:</Text>
                   <Text style={styles.previewValue}>
-                    ${payment.totalInterest.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    {currency === 'ARS' ? '$' : 'US$'}{payment.totalInterest.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                   </Text>
                 </View>
                 <View style={styles.previewRow}>
                   <Text style={styles.previewLabel}>Total a pagar:</Text>
                   <Text style={[styles.previewValue, styles.previewValueHighlight]}>
-                    ${payment.totalAmount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    {currency === 'ARS' ? '$' : 'US$'}{payment.totalAmount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                   </Text>
                 </View>
               </View>
@@ -499,8 +578,17 @@ export default function CreateLoanScreen() {
 
               <View style={styles.confirmDivider} />
 
+              <Text style={styles.confirmLabel}>Moneda</Text>
+              <Text style={styles.confirmValue}>
+                {currency === 'ARS' ? '🇦🇷 Pesos Argentinos' : '🇺🇸 Dólares'}
+              </Text>
+
+              <View style={styles.confirmDivider} />
+
               <Text style={styles.confirmLabel}>Capital</Text>
-              <Text style={styles.confirmValue}>${principal}</Text>
+              <Text style={styles.confirmValue}>
+                {currency === 'ARS' ? '$' : 'US$'}{principal}
+              </Text>
 
               <View style={styles.confirmDivider} />
 
@@ -525,14 +613,14 @@ export default function CreateLoanScreen() {
 
               <Text style={styles.confirmLabel}>Cuota</Text>
               <Text style={[styles.confirmValue, styles.confirmValueHighlight]}>
-                ${payment?.paymentAmount.toFixed(2)} / {termType === 'months' ? 'mes' : 'semana'}
+                {currency === 'ARS' ? '$' : 'US$'}{payment?.paymentAmount.toFixed(2)} / {termType === 'months' ? 'mes' : 'semana'}
               </Text>
 
               <View style={styles.confirmDivider} />
 
               <Text style={styles.confirmLabel}>Total a pagar</Text>
               <Text style={[styles.confirmValue, styles.confirmValueHighlight]}>
-                ${payment?.totalAmount.toFixed(2)}
+                {currency === 'ARS' ? '$' : 'US$'}{payment?.totalAmount.toFixed(2)}
               </Text>
 
               <View style={styles.confirmDivider} />
@@ -844,5 +932,36 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.text.secondary,
     marginTop: spacing.xs,
+  },
+  currencyContainer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  currencyButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  currencyButtonActive: {
+    backgroundColor: colors.primary.main,
+    borderColor: colors.primary.main,
+  },
+  currencyFlag: {
+    fontSize: fontSize.xl,
+  },
+  currencyText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.text.secondary,
+  },
+  currencyTextActive: {
+    color: colors.text.inverse,
   },
 });
