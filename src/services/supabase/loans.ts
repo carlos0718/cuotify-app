@@ -115,6 +115,66 @@ export async function getLoans() {
   return data || [];
 }
 
+/**
+ * Obtiene el color del último préstamo creado
+ * @returns El color del último préstamo o null si no hay préstamos
+ */
+export async function getLastLoanColor(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('loans')
+    .select('color_code')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error getting last loan color:', error);
+    return null;
+  }
+
+  return (data as { color_code: string } | null)?.color_code || null;
+}
+
+/**
+ * Actualiza los colores de todos los préstamos existentes de forma secuencial
+ * Usa la paleta de colores pasteles ciclando por cada préstamo
+ * @param loanColors - Array de colores pasteles
+ * @returns Número de préstamos actualizados
+ */
+export async function updateAllLoanColors(loanColors: string[]): Promise<number> {
+  // Obtener todos los préstamos ordenados por fecha de creación
+  const { data, error: fetchError } = await supabase
+    .from('loans')
+    .select('id')
+    .order('created_at', { ascending: true });
+
+  if (fetchError) {
+    throw new Error(handleSupabaseError(fetchError));
+  }
+
+  const loans = data as { id: string }[] | null;
+
+  if (!loans || loans.length === 0) {
+    return 0;
+  }
+
+  // Actualizar cada préstamo con un color secuencial
+  let updatedCount = 0;
+  for (let i = 0; i < loans.length; i++) {
+    const colorIndex = i % loanColors.length;
+    const { error: updateError } = await supabase
+      .from('loans')
+      .update({ color_code: loanColors[colorIndex] } as never)
+      .eq('id', loans[i].id);
+
+    if (!updateError) {
+      updatedCount++;
+    }
+  }
+
+  return updatedCount;
+}
+
 export async function getLoanById(id: string) {
   const { data, error } = await supabase
     .from('loans')

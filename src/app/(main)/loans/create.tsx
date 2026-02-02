@@ -11,17 +11,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { calculateLoanPayment, calculateEndDate } from '../../../services/calculations';
-import { getOrCreateBorrower, createLoan, getPaymentsByLoan } from '../../../services/supabase';
+import { getOrCreateBorrower, createLoan, getPaymentsByLoan, getLastLoanColor } from '../../../services/supabase';
 import { schedulePaymentReminders } from '../../../services/notifications';
 import { useAuthStore, usePreferencesStore } from '../../../store';
 import { useToast } from '../../../components';
+import { getNextLoanColor } from '../../../utils';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
-
-// Función para obtener un color aleatorio de la paleta
-const getRandomLoanColor = () => {
-  const randomIndex = Math.floor(Math.random() * colors.loanColors.length);
-  return colors.loanColors[randomIndex];
-};
 import { TermType, InterestType, LatePenaltyType, CurrencyType } from '../../../types';
 
 export default function CreateLoanScreen() {
@@ -126,7 +121,11 @@ export default function CreateLoanScreen() {
         termType
       );
 
-      // 3. Crear el préstamo con color pastel aleatorio
+      // 3. Obtener el siguiente color (diferente al último préstamo)
+      const lastColor = await getLastLoanColor();
+      const loanColor = getNextLoanColor(lastColor);
+
+      // 4. Crear el préstamo con color pastel secuencial
       const currencySymbol = currency === 'ARS' ? '$' : 'US$';
       const newLoan = await createLoan({
         lender_id: user.id,
@@ -146,10 +145,10 @@ export default function CreateLoanScreen() {
         grace_period_days: latePenaltyType !== 'none' ? parseInt(gracePeriodDays) : 0,
         late_penalty_rate: latePenaltyType !== 'none' ? parseFloat(latePenaltyRate) : 0,
         late_penalty_type: latePenaltyType,
-        color_code: getRandomLoanColor(),
+        color_code: loanColor,
       });
 
-      // 4. Programar notificaciones de recordatorio para cada cuota
+      // 5. Programar notificaciones de recordatorio para cada cuota
       try {
         const payments = await getPaymentsByLoan(newLoan.id);
         if (payments.length > 0) {

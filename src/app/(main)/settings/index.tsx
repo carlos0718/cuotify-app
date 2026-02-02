@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuthStore, usePreferencesStore } from '../../../store';
-import { Modal } from '../../../components';
+import { Modal, useToast } from '../../../components';
+import { updateAllLoanColors } from '../../../services/supabase';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { CurrencyType } from '../../../types';
 
@@ -50,6 +51,7 @@ function SettingsItem({
 export default function SettingsScreen() {
   const { profile, signOut } = useAuthStore();
   const { defaultCurrency, setDefaultCurrency } = usePreferencesStore();
+  const { showSuccess, showError } = useToast();
 
   // Estados de modales
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
@@ -61,6 +63,19 @@ export default function SettingsScreen() {
   const [showRateModal, setShowRateModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showThanksModal, setShowThanksModal] = useState(false);
+  const [isUpdatingColors, setIsUpdatingColors] = useState(false);
+
+  const handleUpdateLoanColors = async () => {
+    setIsUpdatingColors(true);
+    try {
+      const count = await updateAllLoanColors([...colors.loanColors]);
+      showSuccess('Colores actualizados', `Se actualizaron ${count} préstamos con nuevos colores`);
+    } catch (error) {
+      showError('Error', 'No se pudieron actualizar los colores');
+    } finally {
+      setIsUpdatingColors(false);
+    }
+  };
 
   const handleLogout = async () => {
     setShowLogoutModal(false);
@@ -159,6 +174,13 @@ export default function SettingsScreen() {
             title="Moneda por defecto"
             subtitle={defaultCurrency === 'ARS' ? '🇦🇷 Pesos (ARS)' : '🇺🇸 Dólares (USD)'}
             onPress={() => setShowCurrencyModal(true)}
+          />
+          <SettingsItem
+            icon="🎨"
+            title="Actualizar colores"
+            subtitle={isUpdatingColors ? 'Actualizando...' : 'Renovar colores de préstamos'}
+            onPress={handleUpdateLoanColors}
+            showArrow={!isUpdatingColors}
           />
         </View>
 
