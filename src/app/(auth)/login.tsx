@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
@@ -156,6 +157,11 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
+            <Image
+              source={require('../../../assets/icon.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
             <Text style={styles.logo}>Cuotify</Text>
             <Text style={styles.subtitle}>Gestiona tus préstamos fácilmente</Text>
           </View>
@@ -283,6 +289,11 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: spacing.xl,
+  },
+  logoImage: {
+    width: 100,
+    height: 100,
+    marginBottom: spacing.sm,
   },
   logo: {
     fontSize: fontSize['4xl'],
