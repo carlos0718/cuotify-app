@@ -3,38 +3,73 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar, DateData } from 'react-native-calendars';
 import { router, useFocusEffect } from 'expo-router';
-import { getUpcomingPayments, getOverduePayments } from '../../../services/supabase';
+import { getUpcomingPayments, getOverduePayments, getUpcomingDebtPayments, getOverdueDebtPayments } from '../../../services/supabase';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
-import { Borrower } from '../../../types';
 
-interface PaymentWithLoan {
+// Tipo unificado para préstamos y deudas en el calendario
+interface CalendarPaymentItem {
   id: string;
   due_date: string;
   total_amount: number;
   status: 'pending' | 'paid' | 'partial' | 'overdue';
   payment_number: number;
-  loan: {
-    id: string;
-    principal_amount: number;
-    borrower: Borrower | null;
-  } | null;
+  type: 'loan' | 'debt';
+  name: string;
+  parentId: string;
 }
 
 export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState('');
-  const [payments, setPayments] = useState<PaymentWithLoan[]>([]);
-  const [overduePayments, setOverduePayments] = useState<PaymentWithLoan[]>([]);
+  const [payments, setPayments] = useState<CalendarPaymentItem[]>([]);
+  const [overduePayments, setOverduePayments] = useState<CalendarPaymentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const mapLoanPayments = (data: any[]): CalendarPaymentItem[] =>
+    data.map((p) => ({
+      id: p.id,
+      due_date: p.due_date,
+      total_amount: p.total_amount,
+      status: p.status,
+      payment_number: p.payment_number,
+      type: 'loan' as const,
+      name: p.loan?.borrower?.full_name || 'Sin nombre',
+      parentId: p.loan?.id || '',
+    }));
+
+  const mapDebtPayments = (data: any[]): CalendarPaymentItem[] =>
+    data.map((p) => ({
+      id: p.id,
+      due_date: p.due_date,
+      total_amount: p.total_amount,
+      status: p.status,
+      payment_number: p.payment_number,
+      type: 'debt' as const,
+      name: (p as any).debt?.creditor_name || 'Sin nombre',
+      parentId: (p as any).debt?.id || '',
+    }));
+
   const loadData = async () => {
     try {
-      const [upcomingData, overdueData] = await Promise.all([
-        getUpcomingPayments(60), // Próximos 60 días
+      const [upcomingLoans, overdueLoans, upcomingDebts, overdueDebts] = await Promise.all([
+        getUpcomingPayments(60),
         getOverduePayments(),
+        getUpcomingDebtPayments(60),
+        getOverdueDebtPayments(),
       ]);
-      setPayments(upcomingData as PaymentWithLoan[]);
-      setOverduePayments(overdueData as PaymentWithLoan[]);
+
+      const allUpcoming = [
+        ...mapLoanPayments(upcomingLoans as any[]),
+        ...mapDebtPayments(upcomingDebts as any[]),
+      ].sort((a, b) => a.due_date.localeCompare(b.due_date));
+
+      const allOverdue = [
+        ...mapLoanPayments(overdueLoans as any[]),
+        ...mapDebtPayments(overdueDebts as any[]),
+      ].sort((a, b) => a.due_date.localeCompare(b.due_date));
+
+      setPayments(allUpcoming);
+      setOverduePayments(allOverdue);
     } catch (error) {
       console.error('Error loading calendar:', error);
     } finally {
@@ -58,27 +93,47 @@ export default function CalendarScreen() {
     setSelectedDate(day.dateString);
   };
 
-  const handlePaymentPress = (loanId: string) => {
-    router.push(`/(main)/loans/${loanId}`);
+  const handlePaymentPress = (item: CalendarPaymentItem) => {
+    if (!item.parentId) return;
+    if (item.type === 'loan') {
+      router.push(`/(main)/loans/${item.parentId}`);
+    } else {
+      router.push(`/(main)/debts/${item.parentId}`);
+    }
   };
 
   // Crear marcadores para el calendario
   const getMarkedDates = () => {
-    const marks: Record<string, { marked: boolean; dotColor: string; selected?: boolean; selectedColor?: string }> = {};
+    const marks: Record<string, { marked: boolean; dotColor: string; selected?: boolean; selectedColor?: string; dots?: { key: string; color: string }[] }> = {};
+    const dotsMap: Record<string, { key: string; color: string }[]> = {};
 
-    // Pagos pendientes
+    // Agregar dots por fecha
+    const addDot = (date: string, key: string, color: string) => {
+      if (!dotsMap[date]) dotsMap[date] = [];
+      // Evitar duplicar dots del mismo color
+      if (!dotsMap[date].find(d => d.color === color)) {
+        dotsMap[date].push({ key, color });
+      }
+    };
+
     payments.forEach(payment => {
-      marks[payment.due_date] = {
-        marked: true,
-        dotColor: colors.warning,
-      };
+      addDot(payment.due_date, `pending-${payment.type}`, colors.warning);
     });
 
-    // Pagos vencidos
     overduePayments.forEach(payment => {
-      marks[payment.due_date] = {
+      addDot(payment.due_date, `overdue-${payment.type}`, colors.error);
+    });
+
+    // Construir marks con dots
+    const allDates = new Set([
+      ...Object.keys(dotsMap),
+    ]);
+
+    allDates.forEach(date => {
+      marks[date] = {
         marked: true,
-        dotColor: colors.error,
+        dotColor: dotsMap[date]?.[0]?.color || colors.warning,
+        dots: dotsMap[date],
       };
     });
 
@@ -102,10 +157,10 @@ export default function CalendarScreen() {
     return allPayments.filter(p => p.due_date === selectedDate);
   };
 
-  // Obtener próximos pagos (combinando pendientes y vencidos)
+  // Obtener próximos pagos (combinando pendientes y vencidos, máximo 5)
   const getUpcomingPaymentsList = () => {
     const allPayments = [...overduePayments, ...payments];
-    return allPayments.slice(0, 5); // Máximo 5
+    return allPayments.slice(0, 5);
   };
 
   const formatCurrency = (amount: number) => {
@@ -116,7 +171,7 @@ export default function CalendarScreen() {
     }).format(amount);
   };
 
-  const getPaymentStatus = (payment: PaymentWithLoan): 'overdue' | 'pending' | 'paid' => {
+  const getPaymentStatus = (payment: CalendarPaymentItem): 'overdue' | 'pending' | 'paid' => {
     if (payment.status === 'paid') return 'paid';
     const today = new Date().toISOString().split('T')[0];
     if (payment.due_date < today) return 'overdue';
@@ -207,13 +262,18 @@ export default function CalendarScreen() {
                   <TouchableOpacity
                     key={payment.id}
                     style={styles.paymentCard}
-                    onPress={() => payment.loan && handlePaymentPress(payment.loan.id)}
+                    onPress={() => handlePaymentPress(payment)}
                     activeOpacity={0.7}
                   >
                     <View style={styles.paymentHeader}>
-                      <Text style={styles.paymentName}>
-                        {payment.loan?.borrower?.full_name || 'Sin nombre'}
-                      </Text>
+                      <View style={styles.paymentNameRow}>
+                        <Text style={styles.paymentName}>{payment.name}</Text>
+                        <View style={[styles.typeChip, payment.type === 'debt' && styles.typeChipDebt]}>
+                          <Text style={[styles.typeChipText, payment.type === 'debt' && styles.typeChipTextDebt]}>
+                            {payment.type === 'loan' ? 'Préstamo' : 'Deuda'}
+                          </Text>
+                        </View>
+                      </View>
                       <View
                         style={[
                           styles.statusBadge,
@@ -271,7 +331,7 @@ export default function CalendarScreen() {
                 <TouchableOpacity
                   key={payment.id}
                   style={styles.upcomingCard}
-                  onPress={() => payment.loan && handlePaymentPress(payment.loan.id)}
+                  onPress={() => handlePaymentPress(payment)}
                   activeOpacity={0.7}
                 >
                   <View style={[
@@ -294,9 +354,14 @@ export default function CalendarScreen() {
                     </Text>
                   </View>
                   <View style={styles.upcomingInfo}>
-                    <Text style={styles.upcomingName}>
-                      {payment.loan?.borrower?.full_name || 'Sin nombre'}
-                    </Text>
+                    <View style={styles.upcomingNameRow}>
+                      <Text style={styles.upcomingName}>{payment.name}</Text>
+                      <View style={[styles.typeChip, payment.type === 'debt' && styles.typeChipDebt]}>
+                        <Text style={[styles.typeChipText, payment.type === 'debt' && styles.typeChipTextDebt]}>
+                          {payment.type === 'loan' ? 'Préstamo' : 'Deuda'}
+                        </Text>
+                      </View>
+                    </View>
                     <Text style={styles.upcomingType}>
                       Cuota #{payment.payment_number}
                       {status === 'overdue' && ' • Vencido'}
@@ -395,6 +460,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
+  paymentNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   paymentName: {
     fontSize: fontSize.base,
     fontWeight: fontWeight.semiBold,
@@ -469,6 +539,11 @@ const styles = StyleSheet.create({
   upcomingInfo: {
     flex: 1,
   },
+  upcomingNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   upcomingName: {
     fontSize: fontSize.base,
     fontWeight: fontWeight.semiBold,
@@ -482,5 +557,23 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     fontWeight: fontWeight.bold,
     color: colors.text.primary,
+  },
+  // Chips de tipo (Préstamo / Deuda)
+  typeChip: {
+    backgroundColor: colors.primary.main + '15',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.full,
+  },
+  typeChipText: {
+    fontSize: 10,
+    fontWeight: fontWeight.semiBold,
+    color: colors.primary.main,
+  },
+  typeChipDebt: {
+    backgroundColor: colors.warning + '15',
+  },
+  typeChipTextDebt: {
+    color: colors.warning,
   },
 });

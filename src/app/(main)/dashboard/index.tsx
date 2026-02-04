@@ -5,9 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { useAuthStore } from '../../../store';
-import { getLoans, getLoanStats, getUpcomingPayments } from '../../../services/supabase';
+import { getLoans, getLoanStats, getUpcomingPayments, getActivePersonalDebts, getDebtStats } from '../../../services/supabase';
 import { colors, gradients, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { Borrower } from '../../../types';
+import { PersonalDebt, DebtStats } from '../../../services/supabase/personalDebts';
 
 // Icono de campana para notificaciones
 function BellIcon({ color = '#FFFFFF', size = 22 }: { color?: string; size?: number }) {
@@ -78,6 +79,7 @@ function CircularProgress({
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Círculo de fondo */}
       <View
         style={{
           position: 'absolute',
@@ -88,23 +90,29 @@ function CircularProgress({
           borderColor: 'rgba(255, 255, 255, 0.2)',
         }}
       />
-      <View
-        style={{
-          position: 'absolute',
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth: strokeWidth,
-          borderColor: colors.text.inverse,
-          borderTopColor: 'transparent',
-          borderRightColor: 'transparent',
-          transform: [{ rotate: `${(percentage / 100) * 360 - 90}deg` }],
-        }}
-      />
+      {/* Círculo de progreso - solo si hay porcentaje > 0 */}
+      {percentage > 0 && (
+        <View
+          style={{
+            position: 'absolute',
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            borderWidth: strokeWidth,
+            borderColor: colors.text.inverse,
+            borderTopColor: 'transparent',
+            borderRightColor: 'transparent',
+            transform: [{ rotate: `${(percentage / 100) * 360 - 90}deg` }],
+          }}
+        />
+      )}
+      {/* Texto central */}
       <View style={{ alignItems: 'center' }}>
         <Text style={styles.progressLabel}>TOTAL</Text>
         <Text style={styles.progressValue}>{percentage}% COBRADO</Text>
-        <Text style={styles.progressSubtext}>DE {formatCurrency(totalAmount)}</Text>
+        <Text style={styles.progressSubtext}>
+          {totalAmount > 0 ? `DE ${formatCurrency(totalAmount)}` : 'SIN PRÉSTAMOS'}
+        </Text>
       </View>
     </View>
   );
@@ -209,23 +217,31 @@ function StatCard({
 }
 
 export default function DashboardScreen() {
-  const { profile, isLender } = useAuthStore();
+  const { profile, isLender, isBorrower } = useAuthStore();
   const [loans, setLoans] = useState<LoanWithBorrower[]>([]);
   const [stats, setStats] = useState({ totalLoans: 0, totalLent: 0, totalExpected: 0, activeLoans: 0, completedLoans: 0 });
   const [upcomingPayments, setUpcomingPayments] = useState<PaymentWithLoan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Estados para deudas personales
+  const [debts, setDebts] = useState<PersonalDebt[]>([]);
+  const [debtStats, setDebtStats] = useState<DebtStats | null>(null);
+
   const loadData = async () => {
     try {
-      const [loansData, statsData, paymentsData] = await Promise.all([
+      const [loansData, statsData, paymentsData, debtsData, debtStatsData] = await Promise.all([
         getLoans(),
         getLoanStats(),
         getUpcomingPayments(7),
+        getActivePersonalDebts(),
+        getDebtStats(),
       ]);
       setLoans(loansData as LoanWithBorrower[]);
       setStats(statsData);
       setUpcomingPayments(paymentsData as PaymentWithLoan[]);
+      setDebts(debtsData);
+      setDebtStats(debtStatsData);
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {
@@ -406,32 +422,84 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Estadísticas */}
-        <View style={styles.statsSection}>
-          {/* Por cobrar - Full width */}
-          <StatCard
-            title="Por cobrar"
-            value={formatCurrency(stats.totalExpected - (stats.totalExpected * (calculatePercentage() / 100)))}
-            icon="$"
-            variant="primary"
-            fullWidth
-          />
-          {/* Préstamos activos y Completados - Side by side */}
-          <View style={styles.statsRow}>
+        {/* Estadísticas de préstamos - Solo si es prestamista */}
+        {isLender() && (
+          <View style={styles.statsSection}>
+            {/* Por cobrar - Full width */}
             <StatCard
-              title="Préstamos activos"
-              value={stats.activeLoans.toString()}
-              icon="📋"
-              variant="warning"
+              title="Por cobrar"
+              value={formatCurrency(stats.totalExpected - (stats.totalExpected * (calculatePercentage() / 100)))}
+              icon="$"
+              variant="primary"
+              fullWidth
             />
-            <StatCard
-              title="Completados"
-              value={stats.completedLoans.toString()}
-              icon="✓"
-              variant="success"
-            />
+            {/* Préstamos activos y Completados - Side by side */}
+            <View style={styles.statsRow}>
+              <StatCard
+                title="Préstamos activos"
+                value={stats.activeLoans.toString()}
+                icon="📋"
+                variant="warning"
+              />
+              <StatCard
+                title="Completados"
+                value={stats.completedLoans.toString()}
+                icon="✓"
+                variant="success"
+              />
+            </View>
           </View>
-        </View>
+        )}
+
+        {/* Resumen de deudas personales */}
+        {debtStats && (debtStats.activeDebts > 0 || isBorrower()) && (
+          <View style={styles.debtsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>MIS DEUDAS</Text>
+              <TouchableOpacity onPress={() => router.push('/(main)/debts' as any)}>
+                <Text style={styles.sectionLink}>Ver todas</Text>
+              </TouchableOpacity>
+            </View>
+
+            {debtStats.activeDebts > 0 ? (
+              <View style={styles.debtsSummaryCard}>
+                <View style={styles.debtsSummaryRow}>
+                  <View style={styles.debtsSummaryItem}>
+                    <Text style={styles.debtsSummaryLabel}>Deudas activas</Text>
+                    <Text style={styles.debtsSummaryValue}>{debtStats.activeDebts}</Text>
+                  </View>
+                  <View style={styles.debtsSummaryItem}>
+                    <Text style={styles.debtsSummaryLabel}>Total a pagar</Text>
+                    <Text style={[styles.debtsSummaryValue, { color: colors.error }]}>
+                      {formatCurrency(debtStats.remainingToPay)}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.debtsProgressContainer}>
+                  <View style={styles.debtsProgressBg}>
+                    <View
+                      style={[
+                        styles.debtsProgressFill,
+                        { width: `${debtStats.totalToPay > 0 ? (debtStats.totalPaid / debtStats.totalToPay) * 100 : 0}%` }
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.debtsProgressText}>
+                    {formatCurrency(debtStats.totalPaid)} pagado de {formatCurrency(debtStats.totalToPay)}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.debtsEmptyCard}
+                onPress={() => router.push('/(main)/debts/create' as any)}
+              >
+                <Text style={styles.debtsEmptyText}>No tienes deudas registradas</Text>
+                <Text style={styles.debtsEmptyAction}>+ Registrar una deuda</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Próximos pagos */}
         <View style={styles.section}>
@@ -798,5 +866,77 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     fontWeight: fontWeight.semiBold,
     color: colors.text.inverse,
+  },
+  // Estilos para sección de deudas
+  debtsSection: {
+    marginTop: spacing.lg,
+  },
+  sectionLink: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
+    color: colors.primary.main,
+  },
+  debtsSummaryCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    ...shadow.sm,
+  },
+  debtsSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  debtsSummaryItem: {
+    flex: 1,
+  },
+  debtsSummaryLabel: {
+    fontSize: fontSize.xs,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs / 2,
+  },
+  debtsSummaryValue: {
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+    color: colors.text.primary,
+  },
+  debtsProgressContainer: {
+    marginTop: spacing.xs,
+  },
+  debtsProgressBg: {
+    height: 8,
+    backgroundColor: colors.border,
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+  },
+  debtsProgressFill: {
+    height: '100%',
+    backgroundColor: colors.success,
+    borderRadius: borderRadius.full,
+  },
+  debtsProgressText: {
+    fontSize: fontSize.xs,
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  debtsEmptyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+  },
+  debtsEmptyText: {
+    fontSize: fontSize.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  debtsEmptyAction: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semiBold,
+    color: colors.primary.main,
   },
 });

@@ -216,6 +216,33 @@ export async function updateLoanStatus(id: string, status: Loan['status']) {
   return data;
 }
 
+/**
+ * Eliminar un préstamo (solo si está completado)
+ * Nota: Los pagos se eliminan automáticamente por ON DELETE CASCADE
+ */
+export async function deleteLoan(id: string): Promise<void> {
+  // 1. Verificar que el préstamo existe y obtener su estado
+  const loan = await getLoanById(id);
+
+  if (!loan) {
+    throw new Error('Préstamo no encontrado');
+  }
+
+  // 2. Solo permitir eliminar préstamos completados
+  if (loan.status !== 'completed') {
+    throw new Error('Solo se pueden eliminar préstamos completados');
+  }
+
+  // 3. Eliminar el préstamo
+  // Los pagos se eliminan automáticamente por la configuración CASCADE en la base de datos
+  const { error } = await supabase.from('loans').delete().eq('id', id);
+
+  if (error) throw new Error(handleSupabaseError(error));
+
+  // Nota: Cuando se implemente el sistema de rating de borrowers (plan de suscripción),
+  // aquí se debería actualizar el historial del borrower antes de eliminar
+}
+
 // =============================================
 // PAGOS (Payments)
 // =============================================

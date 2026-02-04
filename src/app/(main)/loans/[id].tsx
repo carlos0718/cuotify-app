@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
-import { getLoanById, getPaymentsByLoan, markPaymentAsPaid, revertPaymentToPending, updateLoanPenalties } from '../../../services/supabase';
+import { getLoanById, getPaymentsByLoan, markPaymentAsPaid, revertPaymentToPending, updateLoanPenalties, deleteLoan } from '../../../services/supabase';
 import { calculateLatePenalty } from '../../../services/calculations';
 import { useToast } from '../../../components';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
@@ -205,6 +205,26 @@ export default function LoanDetailScreen() {
     }
   };
 
+  const handleDeleteLoan = async () => {
+    if (!loan) return;
+
+    // Confirmar antes de eliminar
+    if (!confirm('¿Estás seguro de eliminar este préstamo completado?')) {
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      await deleteLoan(loan.id);
+      showSuccess('Préstamo eliminado', 'El préstamo ha sido eliminado correctamente');
+      router.back();
+    } catch (error) {
+      showError('Error', error instanceof Error ? error.message : 'No se pudo eliminar el préstamo');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
@@ -260,7 +280,13 @@ export default function LoanDetailScreen() {
           <Text style={styles.backButtonText}>← Volver</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Detalle del Préstamo</Text>
-        <View style={{ width: 70 }} />
+        {loan.status === 'completed' ? (
+          <TouchableOpacity onPress={handleDeleteLoan} style={styles.deleteButton} disabled={isProcessing}>
+            <Text style={styles.deleteButtonText}>{isProcessing ? '...' : 'Eliminar'}</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 70 }} />
+        )}
       </View>
 
       <ScrollView
@@ -471,6 +497,15 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: fontSize.sm,
     color: colors.primary.main,
+    fontWeight: fontWeight.medium,
+  },
+  deleteButton: {
+    width: 70,
+    alignItems: 'flex-end',
+  },
+  deleteButtonText: {
+    fontSize: fontSize.sm,
+    color: colors.error,
     fontWeight: fontWeight.medium,
   },
   title: {
