@@ -187,7 +187,7 @@ export async function getLoanById(id: string) {
     .single();
 
   if (error) throw new Error(handleSupabaseError(error));
-  return data;
+  return data as (Loan & { borrower: Borrower; payments: Payment[] }) | null;
 }
 
 export async function getActiveLoans() {
@@ -411,20 +411,27 @@ interface LoanStatsRow {
 }
 
 export async function getLoanStats() {
-  const { data: loans, error } = await supabase
-    .from('loans')
-    .select('status, total_amount, principal_amount');
+  const [loansResult, paymentsResult] = await Promise.all([
+    supabase.from('loans').select('status, total_amount, principal_amount'),
+    supabase.from('payments').select('paid_amount').eq('status', 'paid' as never),
+  ]);
 
-  if (error) throw new Error(handleSupabaseError(error));
+  if (loansResult.error) throw new Error(handleSupabaseError(loansResult.error));
 
-  const loansList = (loans || []) as LoanStatsRow[];
+  const loansList = (loansResult.data || []) as LoanStatsRow[];
+  const totalRecovered = ((paymentsResult.data || []) as { paid_amount: number }[]).reduce(
+    (sum, p) => sum + Number(p.paid_amount),
+    0
+  );
+  const totalExpected = loansList.reduce((sum, l) => sum + Number(l.total_amount), 0);
 
   return {
     totalLoans: loansList.length,
     activeLoans: loansList.filter(l => l.status === 'active').length,
     completedLoans: loansList.filter(l => l.status === 'completed').length,
     totalLent: loansList.reduce((sum, l) => sum + Number(l.principal_amount), 0),
-    totalExpected: loansList.reduce((sum, l) => sum + Number(l.total_amount), 0),
+    totalExpected,
+    totalRecovered,
   };
 }
 

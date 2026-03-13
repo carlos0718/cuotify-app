@@ -1,14 +1,17 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { useAuthStore } from '../../../store';
-import { getLoans, getLoanStats, getUpcomingPayments, getActivePersonalDebts, getDebtStats } from '../../../services/supabase';
+import { getLoans, getLoanStats, getUpcomingPayments, getOverduePayments, getDebtStats } from '../../../services/supabase';
 import { colors, gradients, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { Borrower } from '../../../types';
-import { PersonalDebt, DebtStats } from '../../../services/supabase/personalDebts';
+import { DebtStats } from '../../../services/supabase/personalDebts';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
 
 // Icono de campana para notificaciones
 function BellIcon({ color = '#FFFFFF', size = 22 }: { color?: string; size?: number }) {
@@ -55,68 +58,73 @@ interface PaymentWithLoan {
   } | null;
 }
 
-// Componente de progreso circular simplificado
+function formatShortCurrency(amount: number): string {
+  if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
+  if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`;
+  return `$${amount.toFixed(0)}`;
+}
+
+// Componente de progreso circular para préstamos (lender)
 function CircularProgress({
   percentage,
-  totalAmount,
-  size = 180,
+  label,
+  valueText,
+  subtext,
+  size = 160,
   strokeWidth = 12,
 }: {
   percentage: number;
-  totalAmount: number;
+  label: string;
+  valueText: string;
+  subtext: string;
   size?: number;
   strokeWidth?: number;
 }) {
-  const formatCurrency = (amount: number) => {
-    if (amount >= 1000000) {
-      return `$${(amount / 1000000).toFixed(1)}M`;
-    }
-    if (amount >= 1000) {
-      return `$${(amount / 1000).toFixed(0)}K`;
-    }
-    return `$${amount.toFixed(0)}`;
-  };
+  // Usamos SVG para mejor control del color del arco
+  const r = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * r;
+  const progress = circumference * (1 - percentage / 100);
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Círculo de fondo */}
-      <View
-        style={{
-          position: 'absolute',
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth: strokeWidth,
-          borderColor: 'rgba(255, 255, 255, 0.2)',
-        }}
-      />
-      {/* Círculo de progreso - solo si hay porcentaje > 0 */}
-      {percentage > 0 && (
-        <View
-          style={{
-            position: 'absolute',
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            borderWidth: strokeWidth,
-            borderColor: colors.text.inverse,
-            borderTopColor: 'transparent',
-            borderRightColor: 'transparent',
-            transform: [{ rotate: `${(percentage / 100) * 360 - 90}deg` }],
-          }}
+      <Svg width={size} height={size} style={{ position: 'absolute' }}>
+        {/* Pista de fondo */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke="rgba(255,255,255,0.2)"
+          strokeWidth={strokeWidth}
+          fill="none"
         />
-      )}
+        {/* Arco de progreso - color ámbar para contraste sobre gradiente */}
+        {percentage > 0 && (
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke="#FBBF24"
+            strokeWidth={strokeWidth}
+            fill="none"
+            strokeDasharray={`${circumference}`}
+            strokeDashoffset={progress}
+            strokeLinecap="round"
+            transform={`rotate(-90, ${size / 2}, ${size / 2})`}
+          />
+        )}
+      </Svg>
       {/* Texto central */}
-      <View style={{ alignItems: 'center' }}>
-        <Text style={styles.progressLabel}>TOTAL</Text>
-        <Text style={styles.progressValue}>{percentage}% COBRADO</Text>
-        <Text style={styles.progressSubtext}>
-          {totalAmount > 0 ? `DE ${formatCurrency(totalAmount)}` : 'SIN PRÉSTAMOS'}
+      <View style={{ alignItems: 'center', paddingHorizontal: 8 }}>
+        <Text style={styles.progressLabel}>{label}</Text>
+        <Text style={styles.progressValue} numberOfLines={1} adjustsFontSizeToFit>
+          {valueText}
         </Text>
+        <Text style={styles.progressSubtext} numberOfLines={1}>{subtext}</Text>
       </View>
     </View>
   );
 }
+
 
 // Tarjeta de préstamo
 function LoanCard({
@@ -219,28 +227,28 @@ function StatCard({
 export default function DashboardScreen() {
   const { profile, isLender, isBorrower } = useAuthStore();
   const [loans, setLoans] = useState<LoanWithBorrower[]>([]);
-  const [stats, setStats] = useState({ totalLoans: 0, totalLent: 0, totalExpected: 0, activeLoans: 0, completedLoans: 0 });
+  const [stats, setStats] = useState({ totalLoans: 0, totalLent: 0, totalExpected: 0, totalRecovered: 0, activeLoans: 0, completedLoans: 0 });
   const [upcomingPayments, setUpcomingPayments] = useState<PaymentWithLoan[]>([]);
+  const [overdueCount, setOverdueCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Estados para deudas personales
-  const [debts, setDebts] = useState<PersonalDebt[]>([]);
   const [debtStats, setDebtStats] = useState<DebtStats | null>(null);
 
   const loadData = async () => {
     try {
-      const [loansData, statsData, paymentsData, debtsData, debtStatsData] = await Promise.all([
+      const [loansData, statsData, paymentsData, overdueData, debtStatsData] = await Promise.all([
         getLoans(),
         getLoanStats(),
         getUpcomingPayments(7),
-        getActivePersonalDebts(),
+        getOverduePayments(),
         getDebtStats(),
       ]);
       setLoans(loansData as LoanWithBorrower[]);
       setStats(statsData);
       setUpcomingPayments(paymentsData as PaymentWithLoan[]);
-      setDebts(debtsData);
+      setOverdueCount((overdueData as PaymentWithLoan[]).length);
       setDebtStats(debtStatsData);
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -291,11 +299,16 @@ export default function DashboardScreen() {
     return `Vence en ${diffDays} días`;
   };
 
-  // Calcular porcentaje cobrado (basado en préstamos completados)
-  const calculatePercentage = () => {
-    if (stats.totalLoans === 0) return 0;
-    return Math.round((stats.completedLoans / stats.totalLoans) * 100);
-  };
+  // % cobrado: pagos realmente cobrados vs total esperado
+  const lenderPercentage = stats.totalExpected > 0
+    ? Math.min(100, Math.round((stats.totalRecovered / stats.totalExpected) * 100))
+    : 0;
+
+  const debtPercentage = debtStats && debtStats.totalToPay > 0
+    ? Math.min(100, Math.round((debtStats.totalPaid / debtStats.totalToPay) * 100))
+    : 0;
+
+  const hasDebtData = debtStats !== null && debtStats.activeDebts > 0;
 
   // Obtener los préstamos activos más recientes (máximo 2)
   const activeLoans = loans.filter(l => l.status === 'active').slice(0, 2);
@@ -359,16 +372,57 @@ export default function DashboardScreen() {
               onPress={() => router.push('/(main)/notifications')}
             >
               <BellIcon />
-              {upcomingPayments.length > 0 && <View style={styles.notificationBadge} />}
+              {(upcomingPayments.length + overdueCount) > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {upcomingPayments.length + overdueCount > 9 ? '9+' : upcomingPayments.length + overdueCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
-          <View style={styles.progressContainer}>
-            <CircularProgress
-              percentage={calculatePercentage()}
-              totalAmount={stats.totalExpected}
-            />
-          </View>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            style={{ width: SCREEN_WIDTH, marginHorizontal: -spacing.lg }}
+            contentContainerStyle={styles.progressCarousel}
+          >
+            {/* Página 1: Préstamos (siempre visible) */}
+            <View style={[styles.progressPage, { width: SCREEN_WIDTH }]}>
+              <CircularProgress
+                percentage={lenderPercentage}
+                label="PRÉSTAMOS"
+                valueText={`${lenderPercentage}% COBRADO`}
+                subtext={stats.totalExpected > 0 ? `DE ${formatShortCurrency(stats.totalExpected)}` : 'SIN PRÉSTAMOS'}
+                size={190}
+                strokeWidth={14}
+              />
+            </View>
+
+            {/* Página 2: Mis Deudas */}
+            {hasDebtData && (
+              <View style={[styles.progressPage, { width: SCREEN_WIDTH }]}>
+                <CircularProgress
+                  percentage={debtPercentage}
+                  label="MIS DEUDAS"
+                  valueText={formatShortCurrency(debtStats!.totalToPay)}
+                  subtext={`${debtPercentage}% PAGADO`}
+                  size={190}
+                  strokeWidth={14}
+                />
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Indicadores de página */}
+          {hasDebtData && (
+            <View style={styles.progressDots}>
+              <View style={[styles.progressDot, styles.progressDotActive]} />
+              <View style={styles.progressDot} />
+            </View>
+          )}
         </SafeAreaView>
       </LinearGradient>
 
@@ -428,7 +482,7 @@ export default function DashboardScreen() {
             {/* Por cobrar - Full width */}
             <StatCard
               title="Por cobrar"
-              value={formatCurrency(stats.totalExpected - (stats.totalExpected * (calculatePercentage() / 100)))}
+              value={formatCurrency(stats.totalExpected - stats.totalRecovered)}
               icon="$"
               variant="primary"
               fullWidth
@@ -601,12 +655,20 @@ const styles = StyleSheet.create({
   },
   notificationBadge: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    fontSize: 10,
+    fontWeight: fontWeight.bold,
+    color: colors.text.inverse,
   },
   progressContainer: {
     alignItems: 'center',
@@ -938,5 +1000,61 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: fontWeight.semiBold,
     color: colors.primary.main,
+  },
+  progressCarousel: {
+    alignItems: 'center',
+  },
+  progressPage: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+  },
+  progressDots: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  progressDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  progressDotActive: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    width: 18,
+    borderRadius: 3,
+  },
+  pieLegend: {
+    marginTop: spacing.sm,
+    width: SCREEN_WIDTH - spacing.lg * 2,
+    gap: 4,
+  },
+  pieLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  pieLegendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  pieLegendName: {
+    flex: 1,
+    fontSize: fontSize.xs,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  pieLegendPct: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+  },
+  pieLegendMore: {
+    fontSize: fontSize.xs,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+    marginTop: 2,
   },
 });

@@ -3,11 +3,14 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { getUpcomingPayments, getOverduePayments } from '../../../services/supabase';
+import { getUpcomingDebtPayments, getOverdueDebtPayments } from '../../../services/supabase/personalDebts';
+import { setBadgeCount } from '../../../services/notifications/pushNotifications';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { Borrower } from '../../../types';
+import { PersonalDebt } from '../../../services/supabase/personalDebts';
 
 // Tipos
-type NotificationType = 'payment_reminder' | 'payment_overdue' | 'payment_today';
+type NotificationType = 'payment_reminder' | 'payment_overdue' | 'payment_today' | 'debt_reminder' | 'debt_overdue' | 'debt_today';
 
 interface PaymentWithLoan {
   id: string;
@@ -32,6 +35,17 @@ interface Notification {
   daysUntil: number;
   paymentId: string;
   loanId: string;
+  debtId?: string;
+}
+
+interface DebtPaymentWithDebt {
+  id: string;
+  debt_id: string;
+  due_date: string;
+  total_amount: number;
+  payment_number: number;
+  status: string;
+  debt?: Pick<PersonalDebt, 'id' | 'creditor_name' | 'currency'>;
 }
 
 // Configuración de iconos y colores por tipo
@@ -54,6 +68,21 @@ const notificationConfig: Record<
     color: colors.error,
     bgColor: colors.error + '20',
   },
+  debt_reminder: {
+    icon: '💳',
+    color: '#8B5CF6',
+    bgColor: '#8B5CF620',
+  },
+  debt_today: {
+    icon: '💳',
+    color: '#6366F1',
+    bgColor: '#6366F120',
+  },
+  debt_overdue: {
+    icon: '🔴',
+    color: colors.error,
+    bgColor: colors.error + '20',
+  },
 };
 
 function NotificationItem({
@@ -64,7 +93,8 @@ function NotificationItem({
   onPress: () => void;
 }) {
   const config = notificationConfig[notification.type];
-  const isUrgent = notification.type === 'payment_overdue' || notification.type === 'payment_today';
+  const isUrgent = notification.type === 'payment_overdue' || notification.type === 'payment_today'
+    || notification.type === 'debt_overdue' || notification.type === 'debt_today';
 
   return (
     <TouchableOpacity
@@ -145,21 +175,22 @@ export default function NotificationsScreen() {
 
   const transformToNotifications = (
     upcomingPayments: PaymentWithLoan[],
-    overduePayments: PaymentWithLoan[]
+    overduePayments: PaymentWithLoan[],
+    upcomingDebtPayments: DebtPaymentWithDebt[],
+    overdueDebtPayments: DebtPaymentWithDebt[]
   ): Notification[] => {
     const notifs: Notification[] = [];
 
-    // Pagos vencidos (más urgentes primero)
+    // Pagos de préstamos vencidos
     overduePayments.forEach((payment) => {
       const daysUntil = getDaysUntil(payment.due_date);
       const borrowerName = payment.loan?.borrower?.full_name || 'Sin nombre';
       const currency = (payment.loan?.currency || 'ARS') as 'ARS' | 'USD';
-
       notifs.push({
         id: `overdue-${payment.id}`,
         type: 'payment_overdue',
         title: 'Pago vencido',
-        body: `El pago #${payment.payment_number} de ${borrowerName} por ${formatCurrency(payment.total_amount, currency)} está vencido`,
+        body: `Cuota #${payment.payment_number} de ${borrowerName} por ${formatCurrency(payment.total_amount, currency)} está vencida`,
         time: getTimeLabel(daysUntil),
         daysUntil,
         paymentId: payment.id,
@@ -167,22 +198,15 @@ export default function NotificationsScreen() {
       });
     });
 
-    // Pagos próximos
+    // Pagos de préstamos próximos
     upcomingPayments.forEach((payment) => {
       const daysUntil = getDaysUntil(payment.due_date);
       const borrowerName = payment.loan?.borrower?.full_name || 'Sin nombre';
       const currency = (payment.loan?.currency || 'ARS') as 'ARS' | 'USD';
-
       let type: NotificationType = 'payment_reminder';
       let title = 'Recordatorio de pago';
-
-      if (daysUntil === 0) {
-        type = 'payment_today';
-        title = 'Pago vence hoy';
-      } else if (daysUntil === 1) {
-        title = 'Pago vence mañana';
-      }
-
+      if (daysUntil === 0) { type = 'payment_today'; title = 'Pago vence hoy'; }
+      else if (daysUntil === 1) { title = 'Pago vence mañana'; }
       notifs.push({
         id: `upcoming-${payment.id}`,
         type,
@@ -195,22 +219,68 @@ export default function NotificationsScreen() {
       });
     });
 
-    // Ordenar: vencidos primero (más vencidos primero), luego próximos (más cercanos primero)
+    // Cuotas de deudas personales vencidas
+    overdueDebtPayments.forEach((payment) => {
+      const daysUntil = getDaysUntil(payment.due_date);
+      const creditor = payment.debt?.creditor_name || 'Sin nombre';
+      const currency = (payment.debt?.currency || 'ARS') as 'ARS' | 'USD';
+      notifs.push({
+        id: `debt-overdue-${payment.id}`,
+        type: 'debt_overdue',
+        title: 'Cuota de deuda vencida',
+        body: `Cuota #${payment.payment_number} a ${creditor} por ${formatCurrency(payment.total_amount, currency)} está vencida`,
+        time: getTimeLabel(daysUntil),
+        daysUntil,
+        paymentId: payment.id,
+        loanId: '',
+        debtId: payment.debt_id,
+      });
+    });
+
+    // Cuotas de deudas personales próximas
+    upcomingDebtPayments.forEach((payment) => {
+      const daysUntil = getDaysUntil(payment.due_date);
+      const creditor = payment.debt?.creditor_name || 'Sin nombre';
+      const currency = (payment.debt?.currency || 'ARS') as 'ARS' | 'USD';
+      let type: NotificationType = 'debt_reminder';
+      let title = 'Cuota de deuda próxima';
+      if (daysUntil === 0) { type = 'debt_today'; title = 'Cuota de deuda vence hoy'; }
+      else if (daysUntil === 1) { title = 'Cuota de deuda vence mañana'; }
+      notifs.push({
+        id: `debt-upcoming-${payment.id}`,
+        type,
+        title,
+        body: `Cuota #${payment.payment_number} a ${creditor} por ${formatCurrency(payment.total_amount, currency)}`,
+        time: getTimeLabel(daysUntil),
+        daysUntil,
+        paymentId: payment.id,
+        loanId: '',
+        debtId: payment.debt_id,
+      });
+    });
+
     return notifs.sort((a, b) => a.daysUntil - b.daysUntil);
   };
 
   const loadData = async () => {
     try {
-      const [upcomingData, overdueData] = await Promise.all([
-        getUpcomingPayments(14), // Próximos 14 días
+      const [upcomingData, overdueData, upcomingDebtData, overdueDebtData] = await Promise.all([
+        getUpcomingPayments(14),
         getOverduePayments(),
+        getUpcomingDebtPayments(14),
+        getOverdueDebtPayments(),
       ]);
 
       const notifs = transformToNotifications(
         upcomingData as PaymentWithLoan[],
-        overdueData as PaymentWithLoan[]
+        overdueData as PaymentWithLoan[],
+        upcomingDebtData as unknown as DebtPaymentWithDebt[],
+        overdueDebtData as unknown as DebtPaymentWithDebt[]
       );
       setNotifications(notifs);
+
+      // Limpiar badge del sistema (iOS)
+      setBadgeCount(0).catch(() => {});
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
@@ -231,15 +301,17 @@ export default function NotificationsScreen() {
   };
 
   const handleNotificationPress = (notification: Notification) => {
-    if (notification.loanId) {
+    if (notification.debtId) {
+      router.push(`/(main)/debts/${notification.debtId}` as never);
+    } else if (notification.loanId) {
       router.push(`/(main)/loans/${notification.loanId}`);
     }
   };
 
   // Agrupar notificaciones
-  const overdueNotifs = notifications.filter(n => n.type === 'payment_overdue');
-  const todayNotifs = notifications.filter(n => n.type === 'payment_today');
-  const upcomingNotifs = notifications.filter(n => n.type === 'payment_reminder');
+  const overdueNotifs = notifications.filter(n => n.type === 'payment_overdue' || n.type === 'debt_overdue');
+  const todayNotifs = notifications.filter(n => n.type === 'payment_today' || n.type === 'debt_today');
+  const upcomingNotifs = notifications.filter(n => n.type === 'payment_reminder' || n.type === 'debt_reminder');
 
   const urgentCount = overdueNotifs.length + todayNotifs.length;
 

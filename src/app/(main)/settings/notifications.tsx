@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,20 +7,86 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
+import { usePreferencesStore } from '../../../store';
+import { getNotificationPreferences, saveNotificationPreferences } from '../../../services/supabase';
+import { useToast } from '../../../components';
 
 export default function NotificationSettingsScreen() {
-  const [pushEnabled, setPushEnabled] = useState(true);
-  const [emailEnabled, setEmailEnabled] = useState(true);
-  const [reminderDays, setReminderDays] = useState(5);
+  const {
+    reminderDaysBefore,
+    pushEnabled,
+    setReminderDaysBefore,
+    setPushEnabled,
+  } = usePreferencesStore();
 
-  const handleSave = () => {
-    Alert.alert('Guardado', 'Tus preferencias de notificación han sido actualizadas');
-    router.back();
+  const { showSuccess, showError } = useToast();
+
+  const [localDays, setLocalDays] = useState(reminderDaysBefore);
+  const [localPush, setLocalPush] = useState(pushEnabled);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Cargar preferencias desde Supabase al montar (sincroniza dispositivos)
+  useEffect(() => {
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        const prefs = await getNotificationPreferences();
+        if (prefs) {
+          setLocalDays(prefs.reminder_days_before);
+          setLocalPush(prefs.push_enabled);
+          setReminderDaysBefore(prefs.reminder_days_before);
+          setPushEnabled(prefs.push_enabled);
+        }
+      } catch {
+        // Si falla, usar los valores del store local
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await saveNotificationPreferences({
+        reminder_days_before: localDays,
+        push_enabled: localPush,
+      });
+      // Actualizar store local
+      setReminderDaysBefore(localDays);
+      setPushEnabled(localPush);
+      showSuccess('Guardado', 'Tus preferencias de notificación han sido actualizadas');
+      router.back();
+    } catch {
+      showError('Error', 'No se pudieron guardar las preferencias');
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Text style={styles.backButtonText}>← Volver</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Notificaciones</Text>
+          <View style={{ width: 70 }} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary.main} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -41,28 +107,14 @@ export default function NotificationSettingsScreen() {
             <View style={styles.settingInfo}>
               <Text style={styles.settingTitle}>Notificaciones push</Text>
               <Text style={styles.settingDescription}>
-                Recibe alertas en tu dispositivo
+                Recibe alertas en tu dispositivo aunque la app esté cerrada
               </Text>
             </View>
             <Switch
-              value={pushEnabled}
-              onValueChange={setPushEnabled}
+              value={localPush}
+              onValueChange={setLocalPush}
               trackColor={{ false: colors.border, true: colors.primary.main + '50' }}
-              thumbColor={pushEnabled ? colors.primary.main : colors.text.disabled}
-            />
-          </View>
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Notificaciones por email</Text>
-              <Text style={styles.settingDescription}>
-                Recibe resúmenes en tu correo
-              </Text>
-            </View>
-            <Switch
-              value={emailEnabled}
-              onValueChange={setEmailEnabled}
-              trackColor={{ false: colors.border, true: colors.primary.main + '50' }}
-              thumbColor={emailEnabled ? colors.primary.main : colors.text.disabled}
+              thumbColor={localPush ? colors.primary.main : colors.text.disabled}
             />
           </View>
         </View>
@@ -71,7 +123,7 @@ export default function NotificationSettingsScreen() {
         <Text style={styles.sectionTitle}>Recordatorios de pago</Text>
         <View style={styles.section}>
           <Text style={styles.reminderLabel}>
-            Días antes del vencimiento para enviar recordatorio
+            Días antes del vencimiento para recibir recordatorio
           </Text>
           <View style={styles.reminderOptions}>
             {[1, 3, 5, 7, 10].map((days) => (
@@ -79,14 +131,14 @@ export default function NotificationSettingsScreen() {
                 key={days}
                 style={[
                   styles.reminderOption,
-                  reminderDays === days && styles.reminderOptionActive,
+                  localDays === days && styles.reminderOptionActive,
                 ]}
-                onPress={() => setReminderDays(days)}
+                onPress={() => setLocalDays(days)}
               >
                 <Text
                   style={[
                     styles.reminderOptionText,
-                    reminderDays === days && styles.reminderOptionTextActive,
+                    localDays === days && styles.reminderOptionTextActive,
                   ]}
                 >
                   {days}
@@ -95,54 +147,32 @@ export default function NotificationSettingsScreen() {
             ))}
           </View>
           <Text style={styles.reminderHint}>
-            Recibirás recordatorios diarios desde {reminderDays} días antes hasta
-            que el pago sea marcado como completado.
+            Recibirás una notificación {localDays} {localDays === 1 ? 'día' : 'días'} antes del
+            vencimiento de cada cuota, tanto de préstamos como de deudas personales.
           </Text>
         </View>
 
         {/* Tipos de notificación */}
         <Text style={styles.sectionTitle}>Tipos de alerta</Text>
         <View style={styles.section}>
-          <View style={styles.alertItem}>
-            <Text style={styles.alertIcon}>🔔</Text>
-            <View style={styles.alertInfo}>
-              <Text style={styles.alertTitle}>Recordatorios de pago</Text>
-              <Text style={styles.alertDescription}>
-                Antes del vencimiento de cada cuota
-              </Text>
+          {[
+            { icon: '🔔', title: 'Recordatorios de pago', desc: 'Antes del vencimiento de cada cuota' },
+            { icon: '⚠️', title: 'Pagos vencidos', desc: 'Cuando un pago supera la fecha límite' },
+            { icon: '✓', title: 'Pagos recibidos', desc: 'Cuando se registra un pago' },
+            { icon: '💬', title: 'Comentarios', desc: 'Cuando alguien comenta en una cuota' },
+          ].map((item, i, arr) => (
+            <View
+              key={item.title}
+              style={[styles.alertItem, i === arr.length - 1 && { borderBottomWidth: 0 }]}
+            >
+              <Text style={styles.alertIcon}>{item.icon}</Text>
+              <View style={styles.alertInfo}>
+                <Text style={styles.alertTitle}>{item.title}</Text>
+                <Text style={styles.alertDescription}>{item.desc}</Text>
+              </View>
+              <Text style={styles.alertStatus}>Activo</Text>
             </View>
-            <Text style={styles.alertStatus}>Activo</Text>
-          </View>
-          <View style={styles.alertItem}>
-            <Text style={styles.alertIcon}>⚠️</Text>
-            <View style={styles.alertInfo}>
-              <Text style={styles.alertTitle}>Pagos vencidos</Text>
-              <Text style={styles.alertDescription}>
-                Cuando un pago supera la fecha límite
-              </Text>
-            </View>
-            <Text style={styles.alertStatus}>Activo</Text>
-          </View>
-          <View style={styles.alertItem}>
-            <Text style={styles.alertIcon}>✓</Text>
-            <View style={styles.alertInfo}>
-              <Text style={styles.alertTitle}>Pagos recibidos</Text>
-              <Text style={styles.alertDescription}>
-                Cuando se registra un pago
-              </Text>
-            </View>
-            <Text style={styles.alertStatus}>Activo</Text>
-          </View>
-          <View style={styles.alertItem}>
-            <Text style={styles.alertIcon}>💬</Text>
-            <View style={styles.alertInfo}>
-              <Text style={styles.alertTitle}>Comentarios</Text>
-              <Text style={styles.alertDescription}>
-                Cuando alguien comenta en una cuota
-              </Text>
-            </View>
-            <Text style={styles.alertStatus}>Activo</Text>
-          </View>
+          ))}
         </View>
 
         <View style={{ height: spacing.xl }} />
@@ -150,8 +180,16 @@ export default function NotificationSettingsScreen() {
 
       {/* Botón de guardar */}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>Guardar preferencias</Text>
+        <TouchableOpacity
+          style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+          onPress={handleSave}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.saveButtonText}>Guardar preferencias</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -186,6 +224,11 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: spacing.lg,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionTitle: {
     fontSize: fontSize.sm,
@@ -294,6 +337,9 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
+  },
+  saveButtonDisabled: {
+    opacity: 0.7,
   },
   saveButtonText: {
     fontSize: fontSize.base,

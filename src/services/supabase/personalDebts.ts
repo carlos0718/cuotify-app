@@ -89,11 +89,16 @@ export async function createPersonalDebt(input: CreatePersonalDebtInput): Promis
     total_amount = installment_amount * term_value;
   }
 
-  // 2. Crear la deuda
-  const { data: debt, error: debtError } = await supabase
+  // 2. Obtener el usuario autenticado
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Usuario no autenticado');
+
+  // 3. Crear la deuda
+  const { data: debtRaw, error: debtError } = await supabase
     .from('personal_debts')
     .insert({
       ...input,
+      user_id: user.id,
       total_amount,
       installment_amount,
       delivery_date: input.delivery_date || new Date().toISOString().split('T')[0],
@@ -103,8 +108,11 @@ export async function createPersonalDebt(input: CreatePersonalDebtInput): Promis
 
   if (debtError) throw new Error(handleSupabaseError(debtError));
 
-  // 3. Generar cronograma de pagos
-  const { error: scheduleError } = await supabase.rpc('generate_debt_payment_schedule', {
+  const debt = debtRaw as PersonalDebt;
+
+  // 4. Generar cronograma de pagos
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: scheduleError } = await (supabase as any).rpc('generate_debt_payment_schedule', {
     p_debt_id: debt.id,
     p_principal: principal_amount,
     p_interest_rate: interest_rate,
@@ -120,7 +128,7 @@ export async function createPersonalDebt(input: CreatePersonalDebtInput): Promis
     throw new Error(handleSupabaseError(scheduleError));
   }
 
-  return debt as PersonalDebt;
+  return debt;
 }
 
 /**
@@ -323,6 +331,25 @@ export async function getOverdueDebtPayments(): Promise<DebtPayment[]> {
   }
 
   return data || [];
+}
+
+/**
+ * Obtener total pagado por cada deuda (para el gráfico de torta)
+ * Retorna un mapa { debt_id: totalPaid }
+ */
+export async function getDebtPaidAmounts(): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from('debt_payments')
+    .select('debt_id, paid_amount')
+    .eq('status', 'paid' as never);
+
+  if (error) throw new Error(handleSupabaseError(error));
+
+  const result: Record<string, number> = {};
+  for (const row of ((data || []) as { debt_id: string; paid_amount: number }[])) {
+    result[row.debt_id] = (result[row.debt_id] || 0) + (row.paid_amount || 0);
+  }
+  return result;
 }
 
 // =============================================

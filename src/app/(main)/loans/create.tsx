@@ -22,7 +22,7 @@ import { TermType, InterestType, LatePenaltyType, CurrencyType } from '../../../
 export default function CreateLoanScreen() {
   // Hooks de stores primero
   const { user } = useAuthStore();
-  const { defaultCurrency } = usePreferencesStore();
+  const { defaultCurrency, reminderDaysBefore } = usePreferencesStore();
   const { showSuccess, showError } = useToast();
 
   // Estados
@@ -41,6 +41,23 @@ export default function CreateLoanScreen() {
   const [termType, setTermType] = useState<TermType>('months');
   const [interestType, setInterestType] = useState<InterestType>('simple');
   const [currency, setCurrency] = useState<CurrencyType>(defaultCurrency);
+  const [deliveryDateInput, setDeliveryDateInput] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+  const [notes, setNotes] = useState('');
+
+  // Calcula automáticamente el primer pago según termType
+  const firstPaymentDateCalc = (() => {
+    if (!deliveryDateInput || !/^\d{4}-\d{2}-\d{2}$/.test(deliveryDateInput)) return '';
+    const d = new Date(deliveryDateInput + 'T12:00:00');
+    if (isNaN(d.getTime())) return '';
+    if (termType === 'months') {
+      d.setMonth(d.getMonth() + 1);
+    } else {
+      d.setDate(d.getDate() + 7);
+    }
+    return d.toISOString().split('T')[0];
+  })();
 
   // Configuración de penalización por mora
   const [latePenaltyType, setLatePenaltyType] = useState<LatePenaltyType>('none');
@@ -102,17 +119,9 @@ export default function CreateLoanScreen() {
         phone: borrowerPhone.trim() || null,
       });
 
-      // 2. Calcular fechas
-      const today = new Date();
-      const deliveryDate = today.toISOString().split('T')[0];
-
-      // Primera cuota: 1 mes o 1 semana desde hoy
-      const firstPaymentDate = new Date(today);
-      if (termType === 'months') {
-        firstPaymentDate.setMonth(firstPaymentDate.getMonth() + 1);
-      } else {
-        firstPaymentDate.setDate(firstPaymentDate.getDate() + 7);
-      }
+      // 2. Calcular fechas a partir de la fecha de préstamo ingresada
+      const deliveryDate = deliveryDateInput;
+      const firstPaymentDate = new Date(firstPaymentDateCalc + 'T12:00:00');
 
       // Fecha de fin
       const endDate = calculateEndDate(
@@ -146,6 +155,7 @@ export default function CreateLoanScreen() {
         late_penalty_rate: latePenaltyType !== 'none' ? parseFloat(latePenaltyRate) : 0,
         late_penalty_type: latePenaltyType,
         color_code: loanColor,
+        notes: notes.trim() || null,
       });
 
       // 5. Programar notificaciones de recordatorio para cada cuota
@@ -161,7 +171,7 @@ export default function CreateLoanScreen() {
               amount: p.total_amount,
               paymentNumber: p.payment_number,
             })),
-            newLoan.reminder_days_before || 3
+            reminderDaysBefore
           );
         }
       } catch (notifError) {
@@ -434,6 +444,37 @@ export default function CreateLoanScreen() {
               </View>
             </View>
 
+            {/* Descripción opcional */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Descripción</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Ej: Préstamo para moto, emergencia médica..."
+                placeholderTextColor={colors.text.disabled}
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+
+            {/* Fecha de préstamo */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Fecha de préstamo *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="AAAA-MM-DD"
+                placeholderTextColor={colors.text.disabled}
+                value={deliveryDateInput}
+                onChangeText={setDeliveryDateInput}
+              />
+              <Text style={styles.inputHint}>
+                {firstPaymentDateCalc
+                  ? `Primera cuota: ${firstPaymentDateCalc} (+1 ${termType === 'months' ? 'mes' : 'semana'})`
+                  : 'Formato: 2026-03-15'}
+              </Text>
+            </View>
+
             {/* Configuración de penalización por mora */}
             <View style={styles.penaltySection}>
               <Text style={styles.penaltySectionTitle}>Penalización por mora</Text>
@@ -582,6 +623,14 @@ export default function CreateLoanScreen() {
                 {currency === 'ARS' ? '🇦🇷 Pesos Argentinos' : '🇺🇸 Dólares'}
               </Text>
 
+              {notes.trim() ? (
+                <>
+                  <View style={styles.confirmDivider} />
+                  <Text style={styles.confirmLabel}>Descripción</Text>
+                  <Text style={styles.confirmValue}>{notes.trim()}</Text>
+                </>
+              ) : null}
+
               <View style={styles.confirmDivider} />
 
               <Text style={styles.confirmLabel}>Capital</Text>
@@ -607,6 +656,16 @@ export default function CreateLoanScreen() {
               <Text style={styles.confirmValue}>
                 {termValue} {termType === 'months' ? 'meses' : 'semanas'}
               </Text>
+
+              <View style={styles.confirmDivider} />
+
+              <Text style={styles.confirmLabel}>Fecha de préstamo</Text>
+              <Text style={styles.confirmValue}>{deliveryDateInput}</Text>
+
+              <View style={styles.confirmDivider} />
+
+              <Text style={styles.confirmLabel}>Primera cuota</Text>
+              <Text style={styles.confirmValue}>{firstPaymentDateCalc}</Text>
 
               <View style={styles.confirmDivider} />
 
@@ -926,6 +985,10 @@ const styles = StyleSheet.create({
   },
   penaltyConfig: {
     marginTop: spacing.md,
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
   inputHint: {
     fontSize: fontSize.xs,

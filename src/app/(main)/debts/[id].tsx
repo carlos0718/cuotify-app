@@ -322,7 +322,7 @@ export default function DebtDetailScreen() {
 
           <View style={styles.datesSection}>
             <View style={styles.dateItem}>
-              <Text style={styles.dateLabel}>Entrega</Text>
+              <Text style={styles.dateLabel}>Fecha de préstamo</Text>
               <Text style={styles.dateValue}>{formatDate(debt.delivery_date)}</Text>
             </View>
             <View style={styles.dateItem}>

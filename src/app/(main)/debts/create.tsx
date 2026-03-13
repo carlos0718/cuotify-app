@@ -36,7 +36,16 @@ export default function CreateDebtScreen() {
   const [termType, setTermType] = useState<TermType>('months');
   const [interestType, setInterestType] = useState<InterestType>('simple');
   const [currency, setCurrency] = useState<CurrencyType>(defaultCurrency);
-  const [firstPaymentDate, setFirstPaymentDate] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
+
+  // Calcula automáticamente el primer pago como delivery_date + 30 días
+  const firstPaymentDate = (() => {
+    if (!deliveryDate || !/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) return '';
+    const d = new Date(deliveryDate + 'T12:00:00');
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() + 31);
+    return d.toISOString().split('T')[0];
+  })();
 
   // Configuración de penalización por mora
   const [latePenaltyType, setLatePenaltyType] = useState<LatePenaltyType>('none');
@@ -70,8 +79,8 @@ export default function CreateDebtScreen() {
         showError('Error', 'Completa todos los campos de la deuda');
         return;
       }
-      if (!firstPaymentDate) {
-        showError('Error', 'La fecha del primer pago es obligatoria');
+      if (!deliveryDate || !/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) {
+        showError('Error', 'Ingresa la fecha de préstamo en formato AAAA-MM-DD');
         return;
       }
       setStep(3);
@@ -102,6 +111,7 @@ export default function CreateDebtScreen() {
         term_value: parseInt(termValue),
         term_type: termType,
         currency,
+        delivery_date: deliveryDate,
         first_payment_date: firstPaymentDate,
         late_penalty_type: latePenaltyType,
         late_penalty_rate: latePenaltyType !== 'none' ? parseFloat(latePenaltyRate) : 0,
@@ -374,17 +384,21 @@ export default function CreateDebtScreen() {
               </View>
             </View>
 
-            {/* Fecha del primer pago */}
+            {/* Fecha de préstamo */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Fecha del primer pago *</Text>
+              <Text style={styles.label}>Fecha de préstamo *</Text>
               <TextInput
                 style={styles.input}
                 placeholder="AAAA-MM-DD"
                 placeholderTextColor={colors.text.disabled}
-                value={firstPaymentDate}
-                onChangeText={setFirstPaymentDate}
+                value={deliveryDate}
+                onChangeText={setDeliveryDate}
               />
-              <Text style={styles.inputHint}>Formato: 2026-03-15</Text>
+              <Text style={styles.inputHint}>
+                {firstPaymentDate
+                  ? `Primer pago: ${firstPaymentDate} (+31 días)`
+                  : 'Formato: 2026-03-15 — el primer pago se calculará automáticamente'}
+              </Text>
             </View>
 
             {/* Configuración de penalización por mora */}
@@ -568,6 +582,11 @@ export default function CreateDebtScreen() {
               <Text style={styles.confirmValue}>
                 {termValue} {termType === 'months' ? 'meses' : 'semanas'}
               </Text>
+
+              <View style={styles.confirmDivider} />
+
+              <Text style={styles.confirmLabel}>Fecha de préstamo</Text>
+              <Text style={styles.confirmValue}>{deliveryDate}</Text>
 
               <View style={styles.confirmDivider} />
 
