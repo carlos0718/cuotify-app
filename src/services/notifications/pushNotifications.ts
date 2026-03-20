@@ -1,7 +1,23 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../supabase/client';
+
+// ── Almacenamiento local de IDs de notificaciones programadas ────────────────
+const NOTIF_KEY_PREFIX = 'notif_id:';
+
+async function saveNotifId(paymentId: string, notifId: string): Promise<void> {
+  await AsyncStorage.setItem(`${NOTIF_KEY_PREFIX}${paymentId}`, notifId);
+}
+
+async function getNotifId(paymentId: string): Promise<string | null> {
+  return AsyncStorage.getItem(`${NOTIF_KEY_PREFIX}${paymentId}`);
+}
+
+async function removeNotifId(paymentId: string): Promise<void> {
+  await AsyncStorage.removeItem(`${NOTIF_KEY_PREFIX}${paymentId}`);
+}
 
 // Configurar cómo se muestran las notificaciones cuando la app está en primer plano
 Notifications.setNotificationHandler({
@@ -231,7 +247,18 @@ export function addNotificationResponseListener(
 }
 
 /**
- * Programa recordatorios de pago para un préstamo
+ * Cancela la notificación local de un pago específico por su paymentId
+ */
+export async function cancelPaymentNotification(paymentId: string): Promise<void> {
+  const notifId = await getNotifId(paymentId);
+  if (notifId) {
+    await cancelScheduledNotification(notifId);
+    await removeNotifId(paymentId);
+  }
+}
+
+/**
+ * Programa recordatorios de pago para un préstamo y guarda los IDs localmente
  */
 export async function schedulePaymentReminders(
   loanId: string,
@@ -240,25 +267,61 @@ export async function schedulePaymentReminders(
   reminderDaysBefore: number = 3
 ): Promise<void> {
   for (const payment of payments) {
-    const dueDate = new Date(payment.dueDate);
+    const dueDate = new Date(payment.dueDate + 'T12:00:00');
     const reminderDate = new Date(dueDate);
     reminderDate.setDate(reminderDate.getDate() - reminderDaysBefore);
 
-    // Solo programar si la fecha de recordatorio es futura
     if (reminderDate > new Date()) {
-      await scheduleLocalNotification(
+      const notifId = await scheduleLocalNotification(
         `Cuota #${payment.paymentNumber} - ${borrowerName}`,
         `Vence en ${reminderDaysBefore} días. Monto: $${payment.amount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`,
         reminderDate,
-        {
-          type: 'payment_reminder',
-          loanId,
-          paymentId: payment.id,
-          paymentNumber: payment.paymentNumber,
-        }
+        { type: 'payment_reminder', loanId, paymentId: payment.id, paymentNumber: payment.paymentNumber }
       );
+      if (notifId) await saveNotifId(payment.id, notifId);
     }
   }
+}
 
-  console.log(`Programadas ${payments.length} notificaciones para ${borrowerName}`);
+/**
+ * Programa recordatorios de cuotas para una deuda personal y guarda los IDs localmente
+ */
+export async function scheduleDebtPaymentReminders(
+  debtId: string,
+  creditorName: string,
+  payments: Array<{ id: string; dueDate: string; amount: number; paymentNumber: number }>,
+  reminderDaysBefore: number = 3
+): Promise<void> {
+  for (const payment of payments) {
+    const dueDate = new Date(payment.dueDate + 'T12:00:00');
+    const reminderDate = new Date(dueDate);
+    reminderDate.setDate(reminderDate.getDate() - reminderDaysBefore);
+
+    if (reminderDate > new Date()) {
+      const notifId = await scheduleLocalNotification(
+        `Cuota #${payment.paymentNumber} - ${creditorName}`,
+        `Vence en ${reminderDaysBefore} días. Monto: $${payment.amount.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`,
+        reminderDate,
+        { type: 'debt_reminder', debtId, paymentId: payment.id, paymentNumber: payment.paymentNumber }
+      );
+      if (notifId) await saveNotifId(payment.id, notifId);
+    }
+  }
+}
+
+/**
+ * Actualiza el badge del ícono con la cantidad de pagos vencidos + hoy
+ */
+export async function updateBadgeCount(): Promise<void> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const [loansResult, debtsResult] = await Promise.all([
+      supabase.from('payments').select('*', { count: 'exact', head: true }).neq('status', 'paid').lte('due_date', today),
+      supabase.from('debt_payments').select('*', { count: 'exact', head: true }).neq('status', 'paid').lte('due_date', today),
+    ]);
+    const total = (loansResult.count ?? 0) + (debtsResult.count ?? 0);
+    await setBadgeCount(total);
+  } catch {
+    // No bloquear la app si falla el badge
+  }
 }

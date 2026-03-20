@@ -13,7 +13,8 @@ import { router } from 'expo-router';
 import { calculateLoanPayment, calculateEndDate } from '../../../services/calculations';
 import { getOrCreateBorrower, createLoan, getPaymentsByLoan, getLastLoanColor } from '../../../services/supabase';
 import { schedulePaymentReminders } from '../../../services/notifications';
-import { useAuthStore, usePreferencesStore } from '../../../store';
+import { useAuthStore, usePreferencesStore, useSubscriptionStore, FREE_LIMITS } from '../../../store';
+import { getActiveLoans } from '../../../services/supabase';
 import { useToast } from '../../../components';
 import { getNextLoanColor } from '../../../utils';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
@@ -23,6 +24,7 @@ export default function CreateLoanScreen() {
   // Hooks de stores primero
   const { user } = useAuthStore();
   const { defaultCurrency, reminderDaysBefore } = usePreferencesStore();
+  const { premium } = useSubscriptionStore();
   const { showSuccess, showError } = useToast();
 
   // Estados
@@ -107,6 +109,15 @@ export default function CreateLoanScreen() {
 
   const handleCreate = async () => {
     if (!user || !payment) return;
+
+    // Verificar límite de plan gratuito
+    if (!premium) {
+      const activeLoans = await getActiveLoans();
+      if (activeLoans.length >= FREE_LIMITS.activeLoans) {
+        router.push('/(main)/settings/premium');
+        return;
+      }
+    }
 
     setIsLoading(true);
 

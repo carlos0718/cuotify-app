@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useAuthStore, usePreferencesStore } from '../../../store';
+import { useAuthStore, usePreferencesStore, useSubscriptionStore } from '../../../store';
 import { Modal, useToast } from '../../../components';
 import { updateAllLoanColors } from '../../../services/supabase';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
@@ -51,6 +51,7 @@ function SettingsItem({
 export default function SettingsScreen() {
   const { profile, signOut } = useAuthStore();
   const { defaultCurrency, setDefaultCurrency } = usePreferencesStore();
+  const { premium } = useSubscriptionStore();
   const { showSuccess, showError } = useToast();
 
   // Estados de modales
@@ -217,6 +218,30 @@ export default function SettingsScreen() {
           />
         </View>
 
+        {/* Mi Plan */}
+        <Text style={styles.sectionTitle}>Mi Plan</Text>
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.planCard}
+            onPress={() => router.push('/(main)/settings/premium')}
+          >
+            <View style={styles.planCardLeft}>
+              <Text style={styles.planCardIcon}>{premium ? '⭐' : '🔓'}</Text>
+              <View>
+                <Text style={styles.planCardTitle}>{premium ? 'Plan Premium' : 'Plan Gratuito'}</Text>
+                <Text style={styles.planCardSub}>
+                  {premium ? 'Acceso completo a todas las funciones' : 'Tocá para desbloquear Premium'}
+                </Text>
+              </View>
+            </View>
+            {!premium && (
+              <View style={styles.upgradeBadge}>
+                <Text style={styles.upgradeBadgeText}>Mejorar</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Cerrar sesión */}
         <View style={styles.section}>
           <SettingsItem
@@ -239,7 +264,7 @@ export default function SettingsScreen() {
         visible={showCurrencyModal}
         onClose={() => setShowCurrencyModal(false)}
         title="Moneda por defecto"
-        message="Selecciona la moneda que se usará por defecto al crear nuevos préstamos"
+        message="Selecciona la moneda que se usará por defecto al crear nuevos registros"
         icon="💱"
         accentColor={colors.primary.main}
         buttons={[
@@ -310,14 +335,14 @@ export default function SettingsScreen() {
         title="Preguntas Frecuentes"
         icon="❓"
         accentColor={colors.warning}
-        message={`📌 ¿Cómo creo un préstamo?
-Ve a Préstamos → + Nuevo y completa los datos del prestatario y las condiciones del préstamo.
+        message={`📌 ¿Cómo creo un nuevo registro?
+Ve a Préstamos → + Nuevo y completá los datos del contacto y las condiciones del acuerdo.
 
 📌 ¿Cómo registro un pago?
 Entra al préstamo, selecciona la cuota y toca "Marcar como pagado".
 
-📌 ¿Puedo prestar en dólares?
-Sí, al crear el préstamo puedes elegir entre Pesos (ARS) o Dólares (USD).
+📌 ¿Puedo registrar en dólares?
+Sí, al crear el registro podés elegir entre Pesos (ARS) o Dólares (USD).
 
 📌 ¿Cómo funcionan las notificaciones?
 Recibirás recordatorios automáticos antes del vencimiento de cada cuota.
@@ -348,7 +373,7 @@ Sí, usamos encriptación y tus datos están protegidos en servidores seguros.
 Al usar Cuotify, aceptas estos términos de uso.
 
 2. USO DE LA APLICACIÓN
-Cuotify es una herramienta para gestionar préstamos personales. El usuario es responsable de cumplir con las leyes locales sobre préstamos.
+Cuotify es una herramienta para gestionar pagos y acuerdos financieros personales. El usuario es responsable de cumplir con las leyes locales aplicables.
 
 3. PRIVACIDAD
 Protegemos tu información personal. No compartimos tus datos con terceros sin tu consentimiento.
@@ -500,6 +525,23 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     marginLeft: spacing.xs,
   },
+  planCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+  },
+  planCardLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 },
+  planCardIcon: { fontSize: 28 },
+  planCardTitle: { fontSize: fontSize.base, fontWeight: fontWeight.semiBold, color: colors.text.primary },
+  planCardSub: { fontSize: fontSize.xs, color: colors.text.secondary, marginTop: 2 },
+  upgradeBadge: {
+    backgroundColor: colors.primary.main,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  upgradeBadgeText: { fontSize: fontSize.xs, color: '#fff', fontWeight: fontWeight.semiBold },
   section: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,

@@ -369,6 +369,31 @@ export interface DebtStats {
 /**
  * Obtener estadísticas de deudas personales
  */
+/**
+ * Obtiene la próxima cuota pendiente (o vencida) de cada deuda en una sola query.
+ * Retorna un mapa { debt_id: due_date } con la fecha más cercana sin pagar.
+ */
+export async function getNextPendingPaymentDates(debtIds: string[]): Promise<Record<string, string>> {
+  if (debtIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('debt_payments')
+    .select('debt_id, due_date')
+    .in('debt_id', debtIds)
+    .neq('status', 'paid')
+    .order('due_date', { ascending: true });
+
+  if (error) throw new Error(handleSupabaseError(error));
+
+  const result: Record<string, string> = {};
+  for (const row of ((data || []) as { debt_id: string; due_date: string }[])) {
+    if (!result[row.debt_id]) {
+      result[row.debt_id] = row.due_date;
+    }
+  }
+  return result;
+}
+
 export async function getDebtStats(): Promise<DebtStats> {
   const { data: debts, error } = await supabase
     .from('personal_debts')

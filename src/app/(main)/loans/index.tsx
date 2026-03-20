@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuthStore } from '../../../store';
-import { getLoans, getLoanStats } from '../../../services/supabase';
+import { getLoans, getLoanStats, getNextPendingPaymentDatesByLoan } from '../../../services/supabase';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { Borrower } from '../../../types';
 
@@ -85,9 +85,11 @@ export default function LoansScreen() {
   const { isLender } = useAuthStore();
   const [loans, setLoans] = useState<LoanWithBorrower[]>([]);
   const [stats, setStats] = useState({ totalLoans: 0, totalLent: 0, activeLoans: 0 });
+  const [nextPaymentDates, setNextPaymentDates] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const loadData = async () => {
     try {
@@ -97,6 +99,9 @@ export default function LoansScreen() {
       ]);
       setLoans(loansData as LoanWithBorrower[]);
       setStats(statsData);
+      const activeIds = (loansData as LoanWithBorrower[]).filter(l => l.status === 'active').map(l => l.id);
+      const nextDates = await getNextPendingPaymentDatesByLoan(activeIds);
+      setNextPaymentDates(nextDates);
     } catch (error) {
       console.error('Error loading loans:', error);
     } finally {
@@ -126,10 +131,10 @@ export default function LoansScreen() {
   };
 
   const filteredLoans = loans.filter(loan => {
-    if (filter === 'all') return true;
-    if (filter === 'active') return loan.status === 'active';
-    if (filter === 'completed') return loan.status === 'completed';
-    return true;
+    const matchesFilter = filter === 'all' || loan.status === filter;
+    const matchesSearch = searchQuery.trim() === '' ||
+      loan.borrower?.full_name?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && (matchesSearch ?? true);
   });
 
   const formatCurrency = (amount: number, currency: 'ARS' | 'USD' = 'ARS') => {
@@ -155,7 +160,9 @@ export default function LoansScreen() {
 
   const getDueInfo = (loan: LoanWithBorrower): string => {
     if (loan.status === 'completed') return 'Completado';
-    const nextPayment = new Date(loan.first_payment_date);
+    const nextDueDateStr = nextPaymentDates[loan.id];
+    if (!nextDueDateStr) return 'Al día';
+    const nextPayment = new Date(nextDueDateStr + 'T12:00:00');
     const today = new Date();
     const diffDays = Math.ceil((nextPayment.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays < 0) return `Vencido hace ${Math.abs(diffDays)} días`;
@@ -176,6 +183,20 @@ export default function LoansScreen() {
             <Text style={styles.addButtonText}>Vincular</Text>
           </TouchableOpacity>
         )}
+      </View>
+
+      {/* Buscador */}
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar por nombre..."
+          placeholderTextColor={colors.text.disabled}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+        />
       </View>
 
       {/* Filtros */}
@@ -306,6 +327,20 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: fontWeight.semiBold,
     color: colors.text.inverse,
+  },
+  searchContainer: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  searchInput: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: fontSize.base,
+    color: colors.text.primary,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   filters: {
     flexDirection: 'row',

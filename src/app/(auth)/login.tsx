@@ -61,7 +61,7 @@ export default function LoginScreen() {
           <View style={styles.header}>
             <Image source={require('../../../assets/icon.png')} style={styles.logoImage} />
             <Text style={styles.logo}>Cuotify</Text>
-            <Text style={styles.subtitle}>Gestiona tus préstamos fácilmente</Text>
+            <Text style={styles.subtitle}>Organizá tus finanzas y pagos en un solo lugar</Text>
           </View>
 
           <View style={styles.formContainer}>

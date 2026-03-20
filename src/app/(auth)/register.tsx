@@ -13,28 +13,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, router } from 'expo-router';
 import { useAuthStore } from '../../store';
-import { UserRole } from '../../types';
 import { colors, gradients, spacing, borderRadius, fontSize, fontWeight } from '../../theme';
 import { useToast, PasswordInput } from '../../components';
 import { validateEmail, validateDNI, validatePhone } from '../../utils';
-
-const ROLES: { value: UserRole; label: string; description: string }[] = [
-  {
-    value: 'lender',
-    label: 'Prestamista',
-    description: 'Quiero prestar dinero y hacer seguimiento',
-  },
-  {
-    value: 'borrower',
-    label: 'Prestatario',
-    description: 'Quiero ver mis deudas y hacer pagos',
-  },
-  {
-    value: 'both',
-    label: 'Ambos',
-    description: 'Presto y también tengo deudas',
-  },
-];
 
 export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
@@ -43,33 +24,28 @@ export default function RegisterScreen() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('lender');
 
   const { signUp, isLoading, clearError } = useAuthStore();
   const { showSuccess, showError } = useToast();
 
   const handleRegister = async () => {
-    // Validaciones básicas
     if (!fullName.trim() || !email.trim() || !password || !confirmPassword) {
       showError('Error', 'Por favor completa todos los campos obligatorios');
       return;
     }
 
-    // Validar email con detección de typos
     const emailValidation = validateEmail(email);
     if (!emailValidation.isValid) {
       showError('Correo inválido', emailValidation.error || 'El correo no es válido');
       return;
     }
 
-    // Validar DNI si se proporcionó
     const dniValidation = validateDNI(dni);
     if (!dniValidation.isValid) {
       showError('DNI inválido', dniValidation.error || 'El DNI no es válido');
       return;
     }
 
-    // Validar teléfono si se proporcionó
     const phoneValidation = validatePhone(phone);
     if (!phoneValidation.isValid) {
       showError('Teléfono inválido', phoneValidation.error || 'El teléfono no es válido');
@@ -93,7 +69,7 @@ export default function RegisterScreen() {
         fullName: fullName.trim(),
         dni: dni.trim() || undefined,
         phone: phone.trim() || undefined,
-        role,
+        role: 'both',
       });
 
       showSuccess('Registro exitoso', 'Tu cuenta ha sido creada');
@@ -197,39 +173,6 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>¿Qué tipo de usuario eres? *</Text>
-              <View style={styles.roleContainer}>
-                {ROLES.map((r) => (
-                  <TouchableOpacity
-                    key={r.value}
-                    style={[
-                      styles.roleOption,
-                      role === r.value && styles.roleOptionSelected,
-                    ]}
-                    onPress={() => setRole(r.value)}
-                  >
-                    <Text
-                      style={[
-                        styles.roleLabel,
-                        role === r.value && styles.roleLabelSelected,
-                      ]}
-                    >
-                      {r.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.roleDescription,
-                        role === r.value && styles.roleDescriptionSelected,
-                      ]}
-                    >
-                      {r.description}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
             <TouchableOpacity
               style={[styles.button, isLoading && styles.buttonDisabled]}
               onPress={handleRegister}
@@ -324,36 +267,6 @@ const styles = StyleSheet.create({
   },
   halfWidth: {
     flex: 1,
-  },
-  roleContainer: {
-    gap: spacing.sm,
-  },
-  roleOption: {
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    borderWidth: 2,
-    borderColor: colors.border,
-  },
-  roleOptionSelected: {
-    borderColor: colors.primary.main,
-    backgroundColor: 'rgba(99, 102, 241, 0.05)',
-  },
-  roleLabel: {
-    fontSize: fontSize.base,
-    fontWeight: fontWeight.semiBold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  roleLabelSelected: {
-    color: colors.primary.main,
-  },
-  roleDescription: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
-  },
-  roleDescriptionSelected: {
-    color: colors.primary.dark,
   },
   button: {
     backgroundColor: colors.primary.main,

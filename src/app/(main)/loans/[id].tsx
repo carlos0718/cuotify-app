@@ -4,6 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { getLoanById, getPaymentsByLoan, markPaymentAsPaid, revertPaymentToPending, updateLoanPenalties, deleteLoan } from '../../../services/supabase';
 import { calculateLatePenalty } from '../../../services/calculations';
+import { cancelPaymentNotification, updateBadgeCount } from '../../../services/notifications';
+import { generateLoanPDF } from '../../../services/pdf/loanPdf';
+import { useSubscriptionStore } from '../../../store';
 import { useToast } from '../../../components';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { Borrower, Payment, LatePenaltyType } from '../../../types';
@@ -129,9 +132,11 @@ export default function LoanDetailScreen() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<{ payment: Payment; status: PaymentStatus; penaltyAmount: number } | null>(null);
   const { showSuccess, showError } = useToast();
+  const { premium } = useSubscriptionStore();
 
   const loadData = async () => {
     if (!id) return;
@@ -173,6 +178,8 @@ export default function LoanDetailScreen() {
     setIsProcessing(true);
     try {
       await markPaymentAsPaid(selectedPayment.payment.id, selectedPayment.payment.total_amount);
+      await cancelPaymentNotification(selectedPayment.payment.id);
+      updateBadgeCount();
       showSuccess('Pago registrado', 'El pago ha sido marcado como pagado');
       setSelectedPayment(null);
       loadData();
@@ -203,6 +210,41 @@ export default function LoanDetailScreen() {
     if (!isProcessing) {
       setSelectedPayment(null);
     }
+  };
+
+  const handleExportPDF = async () => {
+    if (!loan) return;
+    if (!premium) {
+      router.push('/(main)/settings/premium');
+      return;
+    }
+    setIsExporting(true);
+    try {
+      await generateLoanPDF(loan as Parameters<typeof generateLoanPDF>[0], payments as Parameters<typeof generateLoanPDF>[1]);
+    } catch {
+      showError('Error', 'No se pudo generar el PDF');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleWhatsApp = () => {
+    if (!loan) return;
+    if (!premium) {
+      router.push('/(main)/settings/premium');
+      return;
+    }
+    const phone = loan.borrower?.phone?.replace(/\D/g, '');
+    if (!phone) {
+      showError('Sin teléfono', 'El prestatario no tiene un número registrado');
+      return;
+    }
+    const nextPending = payments.find((p) => p.status !== 'paid');
+    const msg = nextPending
+      ? `Hola ${loan.borrower?.full_name ?? ''}, te recuerdo que tu cuota #${nextPending.payment_number} vence el ${nextPending.due_date}. — Cuotify`
+      : `Hola ${loan.borrower?.full_name ?? ''}, tu préstamo está al día. ¡Gracias! — Cuotify`;
+    const { Linking } = require('react-native');
+    Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
   };
 
   const handleDeleteLoan = async () => {
@@ -373,6 +415,28 @@ export default function LoanDetailScreen() {
           <Text style={styles.progressLabel}>
             {paidCount} de {payments.length} cuotas pagadas
           </Text>
+        </View>
+
+        {/* Acciones Premium */}
+        <View style={styles.premiumActions}>
+          <TouchableOpacity
+            style={[styles.premiumButton, isExporting && styles.premiumButtonDisabled]}
+            onPress={handleExportPDF}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <ActivityIndicator color={colors.primary.main} size="small" />
+            ) : (
+              <>
+                <Text style={styles.premiumButtonIcon}>{premium ? '📄' : '🔒'}</Text>
+                <Text style={styles.premiumButtonText}>Exportar PDF</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.premiumButton} onPress={handleWhatsApp}>
+            <Text style={styles.premiumButtonIcon}>{premium ? '💬' : '🔒'}</Text>
+            <Text style={styles.premiumButtonText}>WhatsApp</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Lista de pagos */}
@@ -622,6 +686,30 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
     marginTop: spacing.sm,
+  },
+  premiumActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+  },
+  premiumButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary.main + '60',
+    backgroundColor: 'rgba(99,102,241,0.07)',
+  },
+  premiumButtonDisabled: { opacity: 0.5 },
+  premiumButtonIcon: { fontSize: 16 },
+  premiumButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.primary.main,
   },
   paymentsSection: {
     marginTop: spacing.lg,

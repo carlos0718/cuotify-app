@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useAuthStore } from '../../../store';
-import { getLoans, getLoanStats, getUpcomingPayments, getOverduePayments, getDebtStats } from '../../../services/supabase';
+import { getLoans, getLoanStats, getUpcomingPayments, getOverduePayments, getDebtStats, getNextPendingPaymentDatesByLoan } from '../../../services/supabase';
 import { colors, gradients, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { Borrower } from '../../../types';
 import { DebtStats } from '../../../services/supabase/personalDebts';
@@ -235,6 +235,7 @@ export default function DashboardScreen() {
 
   // Estados para deudas personales
   const [debtStats, setDebtStats] = useState<DebtStats | null>(null);
+  const [nextPaymentDates, setNextPaymentDates] = useState<Record<string, string>>({});
 
   const loadData = async () => {
     try {
@@ -250,6 +251,9 @@ export default function DashboardScreen() {
       setUpcomingPayments(paymentsData as PaymentWithLoan[]);
       setOverdueCount((overdueData as PaymentWithLoan[]).length);
       setDebtStats(debtStatsData);
+      const activeIds = (loansData as LoanWithBorrower[]).filter(l => l.status === 'active').map(l => l.id);
+      const nextDates = await getNextPendingPaymentDatesByLoan(activeIds);
+      setNextPaymentDates(nextDates);
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {
@@ -291,7 +295,9 @@ export default function DashboardScreen() {
 
   const getDueInfo = (loan: LoanWithBorrower): string => {
     if (loan.status === 'completed') return 'Completado';
-    const nextPayment = new Date(loan.first_payment_date);
+    const nextDueDateStr = nextPaymentDates[loan.id];
+    if (!nextDueDateStr) return 'Al día';
+    const nextPayment = new Date(nextDueDateStr + 'T12:00:00');
     const today = new Date();
     const diffDays = Math.ceil((nextPayment.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays < 0) return `Vencido hace ${Math.abs(diffDays)} días`;
@@ -364,7 +370,7 @@ export default function DashboardScreen() {
                 Hola, {profile?.full_name?.split(' ')[0] || 'Usuario'}
               </Text>
               <Text style={styles.subtitle}>
-                {isLender() ? 'Tu resumen de préstamos' : 'Tu resumen de deudas'}
+                {isLender() ? 'Tu resumen financiero' : 'Tu resumen de deudas'}
               </Text>
             </View>
             <TouchableOpacity
@@ -449,10 +455,10 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <View style={styles.emptyLoansContainer}>
-            <Text style={styles.emptyLoansText}>No hay préstamos activos</Text>
+            <Text style={styles.emptyLoansText}>No hay registros activos</Text>
             {isLender() && (
               <TouchableOpacity style={styles.emptyLoansButton} onPress={handleNewLoan}>
-                <Text style={styles.emptyLoansButtonText}>Crear primer préstamo</Text>
+                <Text style={styles.emptyLoansButtonText}>Comenzar a registrar</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -502,6 +508,19 @@ export default function DashboardScreen() {
                 variant="success"
               />
             </View>
+            {/* Balance neto - Solo si el usuario también es prestatario */}
+            {isBorrower() && debtStats && (() => {
+              const netBalance = stats.totalLent - debtStats.remainingToPay;
+              return (
+                <StatCard
+                  title="Balance neto"
+                  value={formatCurrency(netBalance)}
+                  icon={netBalance >= 0 ? '↑' : '↓'}
+                  variant={netBalance >= 0 ? 'success' : 'warning'}
+                  fullWidth
+                />
+              );
+            })()}
           </View>
         )}
 

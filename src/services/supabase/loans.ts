@@ -247,6 +247,31 @@ export async function deleteLoan(id: string): Promise<void> {
 // PAGOS (Payments)
 // =============================================
 
+/**
+ * Obtiene la próxima cuota pendiente (o vencida) de cada préstamo en una sola query.
+ * Retorna un mapa { loan_id: due_date } con la fecha más cercana sin pagar.
+ */
+export async function getNextPendingPaymentDatesByLoan(loanIds: string[]): Promise<Record<string, string>> {
+  if (loanIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('payments')
+    .select('loan_id, due_date')
+    .in('loan_id', loanIds)
+    .neq('status', 'paid')
+    .order('due_date', { ascending: true });
+
+  if (error) throw new Error(handleSupabaseError(error));
+
+  const result: Record<string, string> = {};
+  for (const row of ((data || []) as { loan_id: string; due_date: string }[])) {
+    if (!result[row.loan_id]) {
+      result[row.loan_id] = row.due_date;
+    }
+  }
+  return result;
+}
+
 export async function getPaymentsByLoan(loanId: string): Promise<Payment[]> {
   const { data, error } = await supabase
     .from('payments')

@@ -9,6 +9,7 @@ import {
   revertDebtPaymentToPending,
   deletePersonalDebt,
 } from '../../../services/supabase';
+import { cancelPaymentNotification, updateBadgeCount } from '../../../services/notifications';
 import { useToast } from '../../../components';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { PersonalDebt, DebtPayment } from '../../../services/supabase/personalDebts';
@@ -137,6 +138,8 @@ export default function DebtDetailScreen() {
         selectedPayment.payment.id,
         selectedPayment.payment.total_amount + (selectedPayment.payment.penalty_amount || 0)
       );
+      await cancelPaymentNotification(selectedPayment.payment.id);
+      updateBadgeCount();
       showSuccess('Pago registrado', 'El pago ha sido marcado como pagado');
       setSelectedPayment(null);
       loadData();

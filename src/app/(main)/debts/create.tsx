@@ -11,14 +11,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { calculateLoanPayment } from '../../../services/calculations';
-import { createPersonalDebt } from '../../../services/supabase';
+import { createPersonalDebt, getDebtPayments, getActivePersonalDebts } from '../../../services/supabase';
+import { scheduleDebtPaymentReminders } from '../../../services/notifications';
+import { useSubscriptionStore, FREE_LIMITS } from '../../../store';
 import { useToast } from '../../../components';
 import { usePreferencesStore } from '../../../store';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { TermType, InterestType, LatePenaltyType, CurrencyType } from '../../../types';
 
 export default function CreateDebtScreen() {
-  const { defaultCurrency } = usePreferencesStore();
+  const { defaultCurrency, reminderDaysBefore } = usePreferencesStore();
+  const { premium } = useSubscriptionStore();
   const { showSuccess, showError } = useToast();
 
   const [step, setStep] = useState(1);
@@ -98,10 +101,19 @@ export default function CreateDebtScreen() {
   const handleCreate = async () => {
     if (!payment) return;
 
+    // Verificar límite de plan gratuito
+    if (!premium) {
+      const activeDebts = await getActivePersonalDebts();
+      if (activeDebts.length >= FREE_LIMITS.personalDebts) {
+        router.push('/(main)/settings/premium');
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     try {
-      await createPersonalDebt({
+      const newDebt = await createPersonalDebt({
         creditor_name: creditorName.trim(),
         creditor_phone: creditorPhone.trim() || undefined,
         description: description.trim() || undefined,
@@ -117,6 +129,15 @@ export default function CreateDebtScreen() {
         late_penalty_rate: latePenaltyType !== 'none' ? parseFloat(latePenaltyRate) : 0,
         grace_period_days: latePenaltyType !== 'none' ? parseInt(gracePeriodDays) : 0,
       });
+
+      // Programar recordatorios locales
+      const payments = await getDebtPayments(newDebt.id);
+      scheduleDebtPaymentReminders(
+        newDebt.id,
+        creditorName.trim(),
+        payments.map(p => ({ id: p.id, dueDate: p.due_date, amount: p.total_amount, paymentNumber: p.payment_number })),
+        reminderDaysBefore
+      );
 
       const currencySymbol = currency === 'ARS' ? '$' : 'US$';
       showSuccess('Deuda creada', `Deuda de ${currencySymbol}${principal} con ${creditorName}`);

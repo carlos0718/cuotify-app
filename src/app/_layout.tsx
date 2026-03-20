@@ -3,13 +3,15 @@ import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
-import { useAuthStore } from '../store';
+import { useAuthStore, useSubscriptionStore } from '../store';
+import { initializePurchases } from '../services/subscription';
 import { ToastProvider } from '../components';
 import {
   registerForPushNotifications,
   savePushToken,
   addNotificationReceivedListener,
   addNotificationResponseListener,
+  updateBadgeCount,
 } from '../services/notifications';
 
 // Tipo para la suscripción
@@ -17,6 +19,7 @@ type NotificationSubscription = { remove: () => void };
 
 export default function RootLayout() {
   const { initialize, isInitialized, user } = useAuthStore();
+  const { refresh: refreshSubscription } = useSubscriptionStore();
   const notificationListener = useRef<NotificationSubscription | null>(null);
   const responseListener = useRef<NotificationSubscription | null>(null);
 
@@ -29,12 +32,18 @@ export default function RootLayout() {
   useEffect(() => {
     if (!user) return;
 
+    // Inicializar RevenueCat y cargar estado de suscripción
+    initializePurchases(user.id).then(() => refreshSubscription());
+
     // Registrar para push notifications
     registerForPushNotifications().then((token) => {
       if (token) {
         savePushToken(user.id, token);
       }
     });
+
+    // Actualizar badge con pagos vencidos
+    updateBadgeCount();
 
     // Listener cuando llega una notificación (app en primer plano)
     notificationListener.current = addNotificationReceivedListener((notification) => {

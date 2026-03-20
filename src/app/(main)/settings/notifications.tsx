@@ -11,9 +11,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { usePreferencesStore } from '../../../store';
-import { getNotificationPreferences, saveNotificationPreferences } from '../../../services/supabase';
+import {
+  getNotificationPreferences,
+  saveNotificationPreferences,
+  getActiveLoans,
+  getPaymentsByLoan,
+  getActivePersonalDebts,
+  getDebtPayments,
+} from '../../../services/supabase';
+import {
+  cancelAllScheduledNotifications,
+  schedulePaymentReminders,
+  scheduleDebtPaymentReminders,
+  scheduleLocalNotification,
+  updateBadgeCount,
+} from '../../../services/notifications';
 import { useToast } from '../../../components';
 
 export default function NotificationSettingsScreen() {
@@ -30,6 +45,7 @@ export default function NotificationSettingsScreen() {
   const [localPush, setLocalPush] = useState(pushEnabled);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
 
   // Cargar preferencias desde Supabase al montar (sincroniza dispositivos)
   useEffect(() => {
@@ -52,6 +68,51 @@ export default function NotificationSettingsScreen() {
     load();
   }, []);
 
+  // ── Solo en desarrollo ──────────────────────────────────────────────────
+  const handleTestNotification = async () => {
+    setIsTesting(true);
+    try {
+      // 1. Verificar permisos
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') {
+        const { status: newStatus } = await Notifications.requestPermissionsAsync();
+        if (newStatus !== 'granted') {
+          Alert.alert(
+            'Sin permisos',
+            `Estado del permiso: "${newStatus}"\n\nAndá a Ajustes del iPhone → Expo Go → Notificaciones y activá los permisos.`
+          );
+          return;
+        }
+      }
+
+      // 2. Programar notificación en 5 segundos
+      const notifId = await scheduleLocalNotification(
+        '🧪 Notificación de prueba',
+        'Las notificaciones locales funcionan correctamente.',
+        new Date(Date.now() + 5000),
+        { type: 'dev_test' }
+      );
+
+      if (!notifId) {
+        Alert.alert('Error', 'scheduleLocalNotification devolvió null. Revisá la consola para más detalles.');
+        return;
+      }
+
+      await updateBadgeCount();
+
+      Alert.alert(
+        'Listo ✓',
+        `Notificación programada (ID: ${notifId.slice(0, 8)}...)\n\nMinimizá la app ahora — aparece en 5 segundos.`,
+        [{ text: 'OK' }]
+      );
+    } catch (e) {
+      Alert.alert('Error inesperado', e instanceof Error ? e.message : String(e));
+    } finally {
+      setIsTesting(false);
+    }
+  };
+  // ────────────────────────────────────────────────────────────────────────
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -62,6 +123,41 @@ export default function NotificationSettingsScreen() {
       // Actualizar store local
       setReminderDaysBefore(localDays);
       setPushEnabled(localPush);
+
+      // Reprogramar todas las notificaciones locales con la nueva configuración
+      await cancelAllScheduledNotifications();
+      const [loans, debts] = await Promise.all([getActiveLoans(), getActivePersonalDebts()]);
+      await Promise.all([
+        ...loans.map(async (loan: { id: string; borrower?: { full_name?: string } }) => {
+          const payments = await getPaymentsByLoan(loan.id);
+          await schedulePaymentReminders(
+            loan.id,
+            loan.borrower?.full_name ?? 'Prestatario',
+            payments.map((p: { id: string; due_date: string; total_amount: number; payment_number: number }) => ({
+              id: p.id,
+              dueDate: p.due_date,
+              amount: p.total_amount,
+              paymentNumber: p.payment_number,
+            })),
+            localDays
+          );
+        }),
+        ...debts.map(async (debt: { id: string; creditor_name: string }) => {
+          const payments = await getDebtPayments(debt.id);
+          await scheduleDebtPaymentReminders(
+            debt.id,
+            debt.creditor_name,
+            payments.map((p: { id: string; due_date: string; total_amount: number; payment_number: number }) => ({
+              id: p.id,
+              dueDate: p.due_date,
+              amount: p.total_amount,
+              paymentNumber: p.payment_number,
+            })),
+            localDays
+          );
+        }),
+      ]);
+
       showSuccess('Guardado', 'Tus preferencias de notificación han sido actualizadas');
       router.back();
     } catch {
@@ -180,6 +276,19 @@ export default function NotificationSettingsScreen() {
 
       {/* Botón de guardar */}
       <View style={styles.actions}>
+        {__DEV__ && (
+          <TouchableOpacity
+            style={[styles.testButton, isTesting && styles.saveButtonDisabled]}
+            onPress={handleTestNotification}
+            disabled={isTesting}
+          >
+            {isTesting ? (
+              <ActivityIndicator color={colors.warning} size="small" />
+            ) : (
+              <Text style={styles.testButtonText}>🧪 Probar notificación (dev)</Text>
+            )}
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
           onPress={handleSave}
@@ -331,6 +440,19 @@ const styles = StyleSheet.create({
   actions: {
     padding: spacing.lg,
     paddingBottom: spacing.xl,
+  },
+  testButton: {
+    borderWidth: 1.5,
+    borderColor: colors.warning,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  testButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.warning,
   },
   saveButton: {
     backgroundColor: colors.primary.main,

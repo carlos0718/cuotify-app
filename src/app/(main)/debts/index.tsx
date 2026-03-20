@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { getPersonalDebts, getDebtStats } from '../../../services/supabase';
+import { getPersonalDebts, getDebtStats, getNextPendingPaymentDates } from '../../../services/supabase';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { PersonalDebt } from '../../../services/supabase/personalDebts';
 
@@ -71,6 +71,7 @@ function DebtListCard({
 export default function DebtsScreen() {
   const [debts, setDebts] = useState<PersonalDebt[]>([]);
   const [stats, setStats] = useState({ totalDebts: 0, activeDebts: 0, totalToPay: 0 });
+  const [nextPaymentDates, setNextPaymentDates] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
@@ -83,6 +84,10 @@ export default function DebtsScreen() {
       ]);
       setDebts(debtsData);
       setStats(statsData);
+      // Traer la próxima cuota pendiente de cada deuda en una sola query
+      const activeIds = debtsData.filter(d => d.status === 'active').map(d => d.id);
+      const nextDates = await getNextPendingPaymentDates(activeIds);
+      setNextPaymentDates(nextDates);
     } catch (error) {
       console.error('Error loading debts:', error);
     } finally {
@@ -120,7 +125,10 @@ export default function DebtsScreen() {
   const getDueInfo = (debt: PersonalDebt): string => {
     if (debt.status === 'completed') return 'Completada';
     if (debt.status === 'cancelled') return 'Cancelada';
-    const nextPayment = new Date(debt.first_payment_date + 'T12:00:00');
+    // Usar la próxima cuota pendiente real en lugar del first_payment_date
+    const nextDueDateStr = nextPaymentDates[debt.id];
+    if (!nextDueDateStr) return 'Al día';
+    const nextPayment = new Date(nextDueDateStr + 'T12:00:00');
     const today = new Date();
     const diffDays = Math.ceil((nextPayment.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays < 0) return `Vencido hace ${Math.abs(diffDays)} días`;
