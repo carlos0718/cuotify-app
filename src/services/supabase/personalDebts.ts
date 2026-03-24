@@ -436,3 +436,26 @@ export async function getDebtStats(): Promise<DebtStats> {
     remainingToPay: totalToPay - totalPaid,
   };
 }
+
+// =============================================
+// EXPORTACIÓN (Pro)
+// =============================================
+
+/**
+ * Trae todos los pagos de todas las deudas personales del usuario autenticado.
+ * El RLS filtra automáticamente por usuario.
+ * Usado para exportar datos a CSV.
+ */
+export async function getAllDebtPaymentsForExport() {
+  const { data, error } = await supabase
+    .from('debt_payments')
+    .select(`
+      *,
+      debt:personal_debts!inner(user_id, creditor_name)
+    `)
+    .order('debt_id', { ascending: true })
+    .order('payment_number', { ascending: true });
+
+  if (error) throw new Error(handleSupabaseError(error));
+  return (data || []) as (DebtPayment & { debt: { user_id: string; creditor_name: string } })[];
+}

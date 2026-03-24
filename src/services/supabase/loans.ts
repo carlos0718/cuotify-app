@@ -620,3 +620,49 @@ export async function updateLoanPenalties(loanId: string): Promise<Payment[]> {
   if (allError) throw new Error(handleSupabaseError(allError));
   return (allPayments || []) as Payment[];
 }
+
+// =============================================
+// DASHBOARD AVANZADO (Pro)
+// =============================================
+
+export interface MonthlyInterest {
+  year: number;
+  month: number;
+  currency: 'ARS' | 'USD';
+  total_interest: number;
+}
+
+/**
+ * Devuelve los intereses ganados agrupados por mes para el lender autenticado.
+ * Requiere la RPC `get_monthly_interest_earned` en Supabase.
+ * Solo disponible para usuarios Pro.
+ */
+export async function getMonthlyInterestEarned(): Promise<MonthlyInterest[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc('get_monthly_interest_earned');
+  if (error) throw new Error(handleSupabaseError(error));
+  return (data || []) as MonthlyInterest[];
+}
+
+// =============================================
+// EXPORTACIÓN (Pro)
+// =============================================
+
+/**
+ * Trae todos los pagos de todos los préstamos del lender autenticado.
+ * El RLS filtra automáticamente por usuario.
+ * Usado para exportar datos a CSV.
+ */
+export async function getAllPaymentsForExport() {
+  const { data, error } = await supabase
+    .from('payments')
+    .select(`
+      *,
+      loan:loans!inner(lender_id, currency)
+    `)
+    .order('loan_id', { ascending: true })
+    .order('payment_number', { ascending: true });
+
+  if (error) throw new Error(handleSupabaseError(error));
+  return (data || []) as (Payment & { loan: { lender_id: string; currency: string } })[];
+}

@@ -223,14 +223,16 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <TouchableOpacity
             style={styles.planCard}
-            onPress={() => router.push('/(main)/settings/premium')}
+            onPress={() =>
+              router.push(premium ? '/(main)/settings/customer-center' : '/(main)/settings/premium')
+            }
           >
             <View style={styles.planCardLeft}>
               <Text style={styles.planCardIcon}>{premium ? '⭐' : '🔓'}</Text>
               <View>
-                <Text style={styles.planCardTitle}>{premium ? 'Plan Premium' : 'Plan Gratuito'}</Text>
+                <Text style={styles.planCardTitle}>{premium ? 'Cuotify Pro' : 'Plan Gratuito'}</Text>
                 <Text style={styles.planCardSub}>
-                  {premium ? 'Acceso completo a todas las funciones' : 'Tocá para desbloquear Premium'}
+                  {premium ? 'Gestionar suscripción' : 'Tocá para desbloquear Premium'}
                 </Text>
               </View>
             </View>

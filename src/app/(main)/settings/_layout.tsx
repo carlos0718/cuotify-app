@@ -8,6 +8,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="notifications" />
       <Stack.Screen name="security" />
       <Stack.Screen name="premium" />
+      <Stack.Screen name="customer-center" />
     </Stack>
   );
 }

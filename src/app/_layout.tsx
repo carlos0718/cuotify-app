@@ -19,7 +19,7 @@ type NotificationSubscription = { remove: () => void };
 
 export default function RootLayout() {
   const { initialize, isInitialized, user } = useAuthStore();
-  const { refresh: refreshSubscription } = useSubscriptionStore();
+  const { startListening } = useSubscriptionStore();
   const notificationListener = useRef<NotificationSubscription | null>(null);
   const responseListener = useRef<NotificationSubscription | null>(null);
 
@@ -32,8 +32,11 @@ export default function RootLayout() {
   useEffect(() => {
     if (!user) return;
 
-    // Inicializar RevenueCat y cargar estado de suscripción
-    initializePurchases(user.id).then(() => refreshSubscription());
+    // Inicializar RevenueCat y arrancar listener en tiempo real
+    let stopListening: (() => void) | undefined;
+    initializePurchases(user.id).then(() => {
+      stopListening = startListening();
+    });
 
     // Registrar para push notifications
     registerForPushNotifications().then((token) => {
@@ -69,6 +72,7 @@ export default function RootLayout() {
 
     // Cleanup
     return () => {
+      stopListening?.();
       notificationListener.current?.remove();
       responseListener.current?.remove();
     };
