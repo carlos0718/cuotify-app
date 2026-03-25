@@ -97,7 +97,7 @@ export interface Database {
           interest_rate: number;
           term_value: number;
           term_type: 'weeks' | 'months';
-          interest_type: 'simple' | 'french';
+          interest_type: 'simple' | 'french' | 'open';
           currency: 'ARS' | 'USD';
           payment_amount: number;
           total_interest: number;
@@ -123,7 +123,7 @@ export interface Database {
           interest_rate: number;
           term_value: number;
           term_type: 'weeks' | 'months';
-          interest_type?: 'simple' | 'french';
+          interest_type?: 'simple' | 'french' | 'open';
           currency?: 'ARS' | 'USD';
           payment_amount: number;
           total_interest: number;
@@ -149,7 +149,7 @@ export interface Database {
           interest_rate?: number;
           term_value?: number;
           term_type?: 'weeks' | 'months';
-          interest_type?: 'simple' | 'french';
+          interest_type?: 'simple' | 'french' | 'open';
           currency?: 'ARS' | 'USD';
           payment_amount?: number;
           total_interest?: number;

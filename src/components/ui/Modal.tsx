@@ -16,6 +16,7 @@ interface ModalProps {
   children?: React.ReactNode;
   icon?: string;
   accentColor?: string;
+  scrollable?: boolean;
 }
 
 export function Modal({
@@ -27,6 +28,7 @@ export function Modal({
   children,
   icon,
   accentColor = colors.primary.main,
+  scrollable = false,
 }: ModalProps) {
   const getButtonStyle = (style?: ModalButton['style']) => {
     switch (style) {
@@ -71,7 +73,11 @@ export function Modal({
                 <Text style={styles.message}>{message}</Text>
               </ScrollView>
             )}
-            {children}
+            {scrollable ? (
+              <ScrollView style={styles.childrenScroll} showsVerticalScrollIndicator={false}>
+                {children}
+              </ScrollView>
+            ) : children}
           </View>
 
           {/* Botones */}
@@ -150,6 +156,10 @@ const styles = StyleSheet.create({
   },
   messageContainer: {
     maxHeight: 300,
+  },
+  childrenScroll: {
+    maxHeight: 380,
+    width: '100%',
   },
   message: {
     fontSize: fontSize.sm,

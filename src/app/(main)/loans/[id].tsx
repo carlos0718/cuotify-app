@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
-import { getLoanById, getPaymentsByLoan, markPaymentAsPaid, revertPaymentToPending, updateLoanPenalties, deleteLoan } from '../../../services/supabase';
+import { getLoanById, getPaymentsByLoan, markPaymentAsPaid, revertPaymentToPending, deleteLoan } from '../../../services/supabase';
 import { calculateLatePenalty } from '../../../services/calculations';
 import { cancelPaymentNotification, updateBadgeCount } from '../../../services/notifications';
 import { generateLoanPDF } from '../../../services/pdf/loanPdf';
@@ -17,7 +17,7 @@ interface LoanDetail {
   interest_rate: number;
   term_value: number;
   term_type: 'weeks' | 'months';
-  interest_type?: 'simple' | 'french';
+  interest_type?: 'simple' | 'french' | 'open';
   payment_amount: number;
   total_amount: number;
   total_interest: number;
@@ -220,7 +220,7 @@ export default function LoanDetailScreen() {
     }
     setIsExporting(true);
     try {
-      await generateLoanPDF(loan as Parameters<typeof generateLoanPDF>[0], payments as Parameters<typeof generateLoanPDF>[1]);
+      await generateLoanPDF(loan as unknown as Parameters<typeof generateLoanPDF>[0], payments as Parameters<typeof generateLoanPDF>[1]);
     } catch {
       showError('Error', 'No se pudo generar el PDF');
     } finally {

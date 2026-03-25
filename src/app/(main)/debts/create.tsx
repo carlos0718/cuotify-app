@@ -14,7 +14,7 @@ import { calculateLoanPayment } from '../../../services/calculations';
 import { createPersonalDebt, getDebtPayments, getActivePersonalDebts } from '../../../services/supabase';
 import { scheduleDebtPaymentReminders } from '../../../services/notifications';
 import { useSubscriptionStore, FREE_LIMITS } from '../../../store';
-import { useToast } from '../../../components';
+import { useToast, PhoneInput } from '../../../components';
 import { usePreferencesStore } from '../../../store';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { TermType, InterestType, LatePenaltyType, CurrencyType } from '../../../types';
@@ -205,17 +205,10 @@ export default function CreateDebtScreen() {
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Teléfono</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="+54 9 11..."
-                placeholderTextColor={colors.text.disabled}
-                value={creditorPhone}
-                onChangeText={setCreditorPhone}
-                keyboardType="phone-pad"
-              />
-            </View>
+            <PhoneInput
+              value={creditorPhone}
+              onChange={setCreditorPhone}
+            />
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Descripción</Text>

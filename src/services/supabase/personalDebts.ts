@@ -13,7 +13,7 @@ export interface PersonalDebt {
   description?: string;
   principal_amount: number;
   interest_rate: number;
-  interest_type: 'simple' | 'french';
+  interest_type: 'simple' | 'french' | 'open';
   term_value: number;
   term_type: 'weeks' | 'months';
   currency: 'ARS' | 'USD';
@@ -53,7 +53,7 @@ export interface CreatePersonalDebtInput {
   description?: string;
   principal_amount: number;
   interest_rate: number;
-  interest_type: 'simple' | 'french';
+  interest_type: 'simple' | 'french' | 'open';
   term_value: number;
   term_type: 'weeks' | 'months';
   currency: 'ARS' | 'USD';

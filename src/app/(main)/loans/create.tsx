@@ -15,7 +15,7 @@ import { getOrCreateBorrower, createLoan, getPaymentsByLoan, getLastLoanColor } 
 import { schedulePaymentReminders } from '../../../services/notifications';
 import { useAuthStore, usePreferencesStore, useSubscriptionStore, FREE_LIMITS } from '../../../store';
 import { getActiveLoans } from '../../../services/supabase';
-import { useToast } from '../../../components';
+import { useToast, PhoneInput, Modal } from '../../../components';
 import { getNextLoanColor } from '../../../utils';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { TermType, InterestType, LatePenaltyType, CurrencyType } from '../../../types';
@@ -61,6 +61,8 @@ export default function CreateLoanScreen() {
     return d.toISOString().split('T')[0];
   })();
 
+  const [showInterestGuide, setShowInterestGuide] = useState(false);
+
   // Configuración de penalización por mora
   const [latePenaltyType, setLatePenaltyType] = useState<LatePenaltyType>('none');
   const [gracePeriodDays, setGracePeriodDays] = useState('7');
@@ -91,8 +93,12 @@ export default function CreateLoanScreen() {
       }
       setStep(2);
     } else if (step === 2) {
-      if (!principal || !interestRate || !termValue) {
+      if (!principal || !interestRate) {
         showError('Error', 'Completa todos los campos del préstamo');
+        return;
+      }
+      if (interestType !== 'open' && !termValue) {
+        showError('Error', 'Ingresa el plazo del préstamo');
         return;
       }
       setStep(3);
@@ -108,7 +114,8 @@ export default function CreateLoanScreen() {
   };
 
   const handleCreate = async () => {
-    if (!user || !payment) return;
+    if (!user) return;
+    if (interestType !== 'open' && !payment) return;
 
     // Verificar límite de plan gratuito
     if (!premium) {
@@ -134,12 +141,10 @@ export default function CreateLoanScreen() {
       const deliveryDate = deliveryDateInput;
       const firstPaymentDate = new Date(firstPaymentDateCalc + 'T12:00:00');
 
-      // Fecha de fin
-      const endDate = calculateEndDate(
-        firstPaymentDate,
-        parseInt(termValue),
-        termType
-      );
+      // Fecha de fin (null para préstamos abiertos)
+      const endDate = interestType !== 'open'
+        ? calculateEndDate(firstPaymentDate, parseInt(termValue), termType)
+        : null;
 
       // 3. Obtener el siguiente color (diferente al último préstamo)
       const lastColor = await getLastLoanColor();
@@ -147,21 +152,22 @@ export default function CreateLoanScreen() {
 
       // 4. Crear el préstamo con color pastel secuencial
       const currencySymbol = currency === 'ARS' ? '$' : 'US$';
+      const isOpen = interestType === 'open';
       const newLoan = await createLoan({
         lender_id: user.id,
         borrower_id: borrower.id,
         principal_amount: parseFloat(principal),
         interest_rate: parseFloat(interestRate),
-        term_value: parseInt(termValue),
+        term_value: isOpen ? 0 : parseInt(termValue),
         term_type: termType,
         interest_type: interestType,
         currency: currency,
-        payment_amount: payment.paymentAmount,
-        total_interest: payment.totalInterest,
-        total_amount: payment.totalAmount,
+        payment_amount: isOpen ? 0 : (payment?.paymentAmount ?? 0),
+        total_interest: isOpen ? 0 : (payment?.totalInterest ?? 0),
+        total_amount: isOpen ? parseFloat(principal) : (payment?.totalAmount ?? 0),
         delivery_date: deliveryDate,
         first_payment_date: firstPaymentDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
+        end_date: (endDate ? endDate.toISOString().split('T')[0] : null) as never,
         grace_period_days: latePenaltyType !== 'none' ? parseInt(gracePeriodDays) : 0,
         late_penalty_rate: latePenaltyType !== 'none' ? parseFloat(latePenaltyRate) : 0,
         late_penalty_type: latePenaltyType,
@@ -268,17 +274,10 @@ export default function CreateLoanScreen() {
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Teléfono</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="+54 9 11..."
-                placeholderTextColor={colors.text.disabled}
-                value={borrowerPhone}
-                onChangeText={setBorrowerPhone}
-                keyboardType="phone-pad"
-              />
-            </View>
+            <PhoneInput
+              value={borrowerPhone}
+              onChange={setBorrowerPhone}
+            />
           </View>
         )}
 
@@ -352,6 +351,61 @@ export default function CreateLoanScreen() {
               />
             </View>
 
+            {/* Selector de tipo de interés */}
+            <View style={styles.inputGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Tipo de interés</Text>
+                <TouchableOpacity onPress={() => setShowInterestGuide(true)} activeOpacity={0.7}>
+                  <Text style={styles.infoButton}>ⓘ ¿Cuál elegir?</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.interestTypeContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.interestTypeButton,
+                    interestType === 'simple' && styles.interestTypeButtonActive,
+                  ]}
+                  onPress={() => setInterestType('simple')}
+                >
+                  <Text style={[styles.interestTypeText, interestType === 'simple' && styles.interestTypeTextActive]}>
+                    Simple
+                  </Text>
+                  <Text style={[styles.interestTypeDesc, interestType === 'simple' && styles.interestTypeDescActive]}>
+                    Interés fijo sobre capital
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.interestTypeButton,
+                    interestType === 'french' && styles.interestTypeButtonActive,
+                  ]}
+                  onPress={() => setInterestType('french')}
+                >
+                  <Text style={[styles.interestTypeText, interestType === 'french' && styles.interestTypeTextActive]}>
+                    Francés
+                  </Text>
+                  <Text style={[styles.interestTypeDesc, interestType === 'french' && styles.interestTypeDescActive]}>
+                    Cuota fija, interés sobre saldo
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.interestTypeButton,
+                    interestType === 'open' && styles.interestTypeButtonActive,
+                  ]}
+                  onPress={() => setInterestType('open')}
+                >
+                  <Text style={[styles.interestTypeText, interestType === 'open' && styles.interestTypeTextActive]}>
+                    Cuota Libre
+                  </Text>
+                  <Text style={[styles.interestTypeDesc, interestType === 'open' && styles.interestTypeDescActive]}>
+                    Capital variable sin plazo
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {interestType !== 'open' && (
             <View style={styles.row}>
               <View style={[styles.inputGroup, { flex: 1 }]}>
                 <Text style={styles.label}>Plazo *</Text>
@@ -403,57 +457,7 @@ export default function CreateLoanScreen() {
                 </View>
               </View>
             </View>
-
-            {/* Selector de tipo de interés */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Tipo de interés</Text>
-              <View style={styles.interestTypeContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.interestTypeButton,
-                    interestType === 'simple' && styles.interestTypeButtonActive,
-                  ]}
-                  onPress={() => setInterestType('simple')}
-                >
-                  <Text
-                    style={[
-                      styles.interestTypeText,
-                      interestType === 'simple' && styles.interestTypeTextActive,
-                    ]}
-                  >
-                    Simple
-                  </Text>
-                  <Text style={[
-                    styles.interestTypeDesc,
-                    interestType === 'simple' && styles.interestTypeDescActive,
-                  ]}>
-                    Interés fijo sobre capital
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.interestTypeButton,
-                    interestType === 'french' && styles.interestTypeButtonActive,
-                  ]}
-                  onPress={() => setInterestType('french')}
-                >
-                  <Text
-                    style={[
-                      styles.interestTypeText,
-                      interestType === 'french' && styles.interestTypeTextActive,
-                    ]}
-                  >
-                    Francés
-                  </Text>
-                  <Text style={[
-                    styles.interestTypeDesc,
-                    interestType === 'french' && styles.interestTypeDescActive,
-                  ]}>
-                    Cuota fija, interés sobre saldo
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            )}
 
             {/* Descripción opcional */}
             <View style={styles.inputGroup}>
@@ -617,6 +621,58 @@ export default function CreateLoanScreen() {
             )}
           </View>
         )}
+
+        {/* Modal: guía de tipos de interés */}
+        <Modal
+          visible={showInterestGuide}
+          onClose={() => setShowInterestGuide(false)}
+          title="¿Qué tipo de préstamo elegir?"
+          icon="📚"
+          scrollable
+          buttons={[{ text: 'Entendido', style: 'primary', onPress: () => setShowInterestGuide(false) }]}
+        >
+          <View style={{ width: '100%', marginTop: spacing.sm }}>
+            {/* Simple */}
+            <View style={styles.guideSection}>
+              <Text style={[styles.guideSectionBadge, { backgroundColor: colors.primary.main }]}>Simple</Text>
+              <Text style={styles.guideSectionTitle}>Interés fijo sobre el capital</Text>
+              <Text style={styles.guideSectionDesc}>
+                El interés se calcula una sola vez sobre el capital original y se divide en partes iguales entre todas las cuotas. Todas las cuotas son iguales.
+              </Text>
+              <Text style={styles.guideSectionExample}>
+                Ej: $100.000 al 24% anual, 6 meses → interés total $12.000 → cuota fija de $18.667
+              </Text>
+            </View>
+
+            <View style={styles.guideDivider} />
+
+            {/* Francés */}
+            <View style={styles.guideSection}>
+              <Text style={[styles.guideSectionBadge, { backgroundColor: '#8B5CF6' }]}>Francés</Text>
+              <Text style={styles.guideSectionTitle}>Cuota fija, interés decreciente</Text>
+              <Text style={styles.guideSectionDesc}>
+                La cuota es siempre la misma pero cambia su composición: al principio pagás más interés y menos capital; al final pagás más capital y menos interés.
+              </Text>
+              <Text style={styles.guideSectionExample}>
+                Ej: $100.000 al 24% anual, 6 meses → cuota fija de $17.853 (interés decrece mes a mes)
+              </Text>
+            </View>
+
+            <View style={styles.guideDivider} />
+
+            {/* Cuota Libre */}
+            <View style={[styles.guideSection, { marginBottom: 0 }]}>
+              <Text style={[styles.guideSectionBadge, { backgroundColor: '#F59E0B' }]}>Cuota Libre</Text>
+              <Text style={styles.guideSectionTitle}>Sin plazo fijo, capital variable</Text>
+              <Text style={styles.guideSectionDesc}>
+                Cada mes se paga el interés sobre el saldo actual. El prestatario puede abonar cualquier monto al capital. El préstamo termina cuando el saldo llega a $0.
+              </Text>
+              <Text style={styles.guideSectionExample}>
+                Ej: $500.000 al 180% anual (15% mensual) → mes 1: solo $75.000 de interés; mes 2: $75.000 interés + $100.000 capital = $175.000; saldo nuevo: $400.000
+              </Text>
+            </View>
+          </View>
+        </Modal>
 
         {/* Paso 3: Confirmación */}
         {step === 3 && (
@@ -865,6 +921,7 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semiBold,
     color: colors.text.primary,
     marginBottom: spacing.xs,
+    textAlign: 'center',
   },
   interestTypeTextActive: {
     color: colors.text.inverse,
@@ -877,6 +934,53 @@ const styles = StyleSheet.create({
   interestTypeDescActive: {
     color: colors.text.inverse,
     opacity: 0.8,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  infoButton: {
+    fontSize: fontSize.xs,
+    color: colors.primary.main,
+    fontWeight: fontWeight.medium,
+  },
+  guideSection: {
+    marginBottom: spacing.md,
+  },
+  guideSectionTitle: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  guideSectionBadge: {
+    fontSize: fontSize.xs,
+    color: colors.text.inverse,
+    fontWeight: fontWeight.semiBold,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
+    marginBottom: spacing.xs,
+  },
+  guideSectionDesc: {
+    fontSize: fontSize.sm,
+    color: colors.text.secondary,
+    lineHeight: 20,
+    marginBottom: spacing.xs,
+  },
+  guideSectionExample: {
+    fontSize: fontSize.xs,
+    color: colors.text.disabled,
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  guideDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.md,
   },
   preview: {
     backgroundColor: colors.primary.main + '10',

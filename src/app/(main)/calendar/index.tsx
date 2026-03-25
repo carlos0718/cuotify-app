@@ -304,8 +304,10 @@ export default function CalendarScreen() {
                         </Text>
                       </View>
                     </View>
-                    <Text style={styles.paymentType}>Cuota #{payment.payment_number}</Text>
-                    <Text style={styles.paymentAmount}>{formatCurrency(payment.total_amount)}</Text>
+                    <View style={styles.paymentFooter}>
+                      <Text style={styles.paymentType}>Cuota #{payment.payment_number}</Text>
+                      <Text style={styles.paymentAmount}>{formatCurrency(payment.total_amount)}</Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })
@@ -355,24 +357,23 @@ export default function CalendarScreen() {
                   </View>
                   <View style={styles.upcomingInfo}>
                     <View style={styles.upcomingNameRow}>
-                      <Text style={styles.upcomingName}>{payment.name}</Text>
+                      <Text style={styles.upcomingName} numberOfLines={1}>{payment.name}</Text>
                       <View style={[styles.typeChip, payment.type === 'debt' && styles.typeChipDebt]}>
                         <Text style={[styles.typeChipText, payment.type === 'debt' && styles.typeChipTextDebt]}>
                           {payment.type === 'loan' ? 'Préstamo' : 'Deuda'}
                         </Text>
                       </View>
                     </View>
-                    <Text style={styles.upcomingType}>
-                      Cuota #{payment.payment_number}
-                      {status === 'overdue' && ' • Vencido'}
-                    </Text>
+                    <View style={styles.upcomingFooter}>
+                      <Text style={styles.upcomingType}>
+                        Cuota #{payment.payment_number}
+                        {status === 'overdue' && ' • Vencido'}
+                      </Text>
+                      <Text style={[styles.upcomingAmount, status === 'overdue' && { color: colors.error }]}>
+                        {formatCurrency(payment.total_amount)}
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={[
-                    styles.upcomingAmount,
-                    status === 'overdue' && { color: colors.error }
-                  ]}>
-                    {formatCurrency(payment.total_amount)}
-                  </Text>
                 </TouchableOpacity>
               );
             })
@@ -483,11 +484,16 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.text.secondary,
   },
+  paymentFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
   paymentAmount: {
-    fontSize: fontSize.lg,
+    fontSize: fontSize.base,
     fontWeight: fontWeight.bold,
     color: colors.text.primary,
-    marginTop: spacing.sm,
   },
   noPayments: {
     backgroundColor: colors.surface,
@@ -548,6 +554,12 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     fontWeight: fontWeight.semiBold,
     color: colors.text.primary,
+  },
+  upcomingFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
   },
   upcomingType: {
     fontSize: fontSize.sm,

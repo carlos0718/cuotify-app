@@ -13,7 +13,7 @@ export type LoanStatus = 'active' | 'completed' | 'defaulted' | 'cancelled';
 export type PaymentStatus = 'pending' | 'paid' | 'partial' | 'overdue';
 
 // Tipo de cálculo de interés
-export type InterestType = 'simple' | 'french';
+export type InterestType = 'simple' | 'french' | 'open';
 
 // Tipo de penalización por mora
 export type LatePenaltyType = 'none' | 'fixed' | 'daily' | 'weekly';
