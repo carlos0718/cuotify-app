@@ -6,7 +6,8 @@ import {
   Animated,
   TouchableOpacity,
 } from 'react-native';
-import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { spacing, borderRadius, shadow, fontSize, fontWeight } from '../../theme';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -19,32 +20,23 @@ export interface ToastProps {
   onHide: () => void;
 }
 
-const toastConfig = {
-  success: {
-    backgroundColor: colors.success,
-    iconBg: 'rgba(255, 255, 255, 0.3)',
-    icon: '✓',
-    textColor: '#FFFFFF',
-  },
-  error: {
-    backgroundColor: colors.error,
-    iconBg: 'rgba(255, 255, 255, 0.3)',
-    icon: '✕',
-    textColor: '#FFFFFF',
-  },
-  warning: {
-    backgroundColor: colors.warning,
-    iconBg: 'rgba(0, 0, 0, 0.15)',
-    icon: '⚠',
-    textColor: '#1E293B',
-  },
-  info: {
-    backgroundColor: colors.primary.main,
-    iconBg: 'rgba(255, 255, 255, 0.3)',
-    icon: 'ℹ',
-    textColor: '#FFFFFF',
-  },
+const DOT_COLORS: Record<ToastType, string> = {
+  success: '#22C55E',
+  error:   '#EF4444',
+  warning: '#F59E0B',
+  info:    '#60A5FA',
 };
+
+const TYPE_ICONS: Record<ToastType, string> = {
+  success: '✓',
+  error:   '✕',
+  warning: '⚠',
+  info:    'ℹ',
+};
+
+const TOAST_BG = 'rgba(15, 23, 42, 0.92)';
+const TEXT_COLOR = '#FFFFFF';
+const SUBTEXT_COLOR = 'rgba(255, 255, 255, 0.65)';
 
 export function Toast({
   visible,
@@ -54,20 +46,23 @@ export function Toast({
   duration = 3000,
   onHide,
 }: ToastProps) {
-  const translateY = useRef(new Animated.Value(-100)).current;
+  const insets = useSafeAreaInsets();
+  const translateY = useRef(new Animated.Value(120)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
       Animated.parallel([
-        Animated.timing(translateY, {
+        Animated.spring(translateY, {
           toValue: 0,
-          duration: 300,
           useNativeDriver: true,
+          damping: 18,
+          stiffness: 220,
+          mass: 0.8,
         }),
         Animated.timing(opacity, {
           toValue: 1,
-          duration: 300,
+          duration: 180,
           useNativeDriver: true,
         }),
       ]).start();
@@ -83,13 +78,13 @@ export function Toast({
   const hideToast = () => {
     Animated.parallel([
       Animated.timing(translateY, {
-        toValue: -100,
-        duration: 300,
+        toValue: 120,
+        duration: 240,
         useNativeDriver: true,
       }),
       Animated.timing(opacity, {
         toValue: 0,
-        duration: 300,
+        duration: 200,
         useNativeDriver: true,
       }),
     ]).start(() => onHide());
@@ -97,41 +92,39 @@ export function Toast({
 
   if (!visible) return null;
 
-  const config = toastConfig[type];
-  const isWarning = type === 'warning';
+  const dotColor = DOT_COLORS[type];
+  const icon = TYPE_ICONS[type];
+  const bottomOffset = (insets.bottom || 0) + spacing.xl;
 
   return (
     <Animated.View
       style={[
         styles.container,
-        { backgroundColor: config.backgroundColor },
+        { bottom: bottomOffset },
         { transform: [{ translateY }], opacity },
       ]}
     >
       <TouchableOpacity
-        style={styles.content}
-        activeOpacity={0.9}
+        style={styles.pill}
+        activeOpacity={0.85}
         onPress={hideToast}
       >
-        <View style={[styles.iconContainer, { backgroundColor: config.iconBg }]}>
-          <Text style={[styles.icon, { color: config.textColor }]}>{config.icon}</Text>
+        {/* dot indicador de tipo */}
+        <View style={[styles.dot, { backgroundColor: dotColor }]} />
+
+        {/* ícono pequeño */}
+        <Text style={[styles.icon, { color: dotColor }]}>{icon}</Text>
+
+        {/* textos */}
+        <View style={styles.textWrap}>
+          <Text style={styles.title} numberOfLines={1}>{title}</Text>
+          {message ? (
+            <Text style={styles.message} numberOfLines={1}>{message}</Text>
+          ) : null}
         </View>
-        <View style={styles.textContainer}>
-          <Text style={[styles.title, { color: config.textColor }]}>{title}</Text>
-          {message && (
-            <Text
-              style={[
-                styles.message,
-                { color: isWarning ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.95)' }
-              ]}
-            >
-              {message}
-            </Text>
-          )}
-        </View>
-        <View style={[styles.closeButton, { backgroundColor: config.iconBg }]}>
-          <Text style={[styles.closeIcon, { color: config.textColor }]}>×</Text>
-        </View>
+
+        {/* botón cerrar */}
+        <Text style={styles.closeIcon}>×</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -140,54 +133,62 @@ export function Toast({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 60,
     left: spacing.md,
     right: spacing.md,
-    borderRadius: borderRadius.xl,
-    ...shadow.lg,
+    alignItems: 'center',
     zIndex: 9999,
   },
-  content: {
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    paddingVertical: spacing.lg,
+    backgroundColor: TOAST_BG,
+    borderRadius: borderRadius.full,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+    // sombra pronunciada
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.32,
+    shadowRadius: 20,
+    elevation: 12,
+    alignSelf: 'center',
+    maxWidth: '100%',
   },
-  iconContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    flexShrink: 0,
   },
   icon: {
-    fontSize: 22,
+    fontSize: 14,
     fontWeight: fontWeight.bold,
+    flexShrink: 0,
   },
-  textContainer: {
-    flex: 1,
+  textWrap: {
+    flexShrink: 1,
+    flexDirection: 'column',
   },
   title: {
-    fontSize: fontSize.base,
-    fontWeight: fontWeight.bold,
-  },
-  message: {
     fontSize: fontSize.sm,
-    marginTop: 4,
+    fontWeight: fontWeight.semiBold,
+    color: TEXT_COLOR,
     lineHeight: 18,
   },
-  closeButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: spacing.sm,
+  message: {
+    fontSize: 11,
+    fontWeight: fontWeight.regular,
+    color: SUBTEXT_COLOR,
+    lineHeight: 15,
+    marginTop: 1,
   },
   closeIcon: {
-    fontSize: 22,
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.45)',
     fontWeight: fontWeight.bold,
-    marginTop: -2,
+    marginLeft: spacing.xs,
+    flexShrink: 0,
+    lineHeight: 20,
   },
 });
