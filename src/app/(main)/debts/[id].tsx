@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal as RNModal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import {
@@ -10,7 +10,7 @@ import {
   deletePersonalDebt,
 } from '../../../services/supabase';
 import { cancelPaymentNotification, updateBadgeCount } from '../../../services/notifications';
-import { useToast } from '../../../components';
+import { useToast, Modal } from '../../../components';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { PersonalDebt, DebtPayment } from '../../../services/supabase/personalDebts';
 
@@ -93,6 +93,7 @@ export default function DebtDetailScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<{ payment: DebtPayment; status: PaymentStatus } | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const { showSuccess, showError } = useToast();
 
   const loadData = async () => {
@@ -166,32 +167,23 @@ export default function DebtDetailScreen() {
     }
   };
 
-  const handleDeleteDebt = async () => {
+  const handleDeleteDebt = () => {
     if (!debt) return;
+    setShowDeleteModal(true);
+  };
 
-    Alert.alert(
-      'Eliminar Deuda',
-      '¿Estás seguro de eliminar esta deuda completada?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            setIsProcessing(true);
-            try {
-              await deletePersonalDebt(debt.id);
-              showSuccess('Deuda eliminada', 'La deuda ha sido eliminada correctamente');
-              router.back();
-            } catch (error) {
-              showError('Error', error instanceof Error ? error.message : 'No se pudo eliminar la deuda');
-            } finally {
-              setIsProcessing(false);
-            }
-          },
-        },
-      ]
-    );
+  const confirmDeleteDebt = async () => {
+    if (!debt) return;
+    setIsProcessing(true);
+    try {
+      await deletePersonalDebt(debt.id);
+      showSuccess('Deuda eliminada', 'La deuda ha sido eliminada correctamente');
+      router.back();
+    } catch (error) {
+      showError('Error', error instanceof Error ? error.message : 'No se pudo eliminar la deuda');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const closeModal = () => {
@@ -365,7 +357,7 @@ export default function DebtDetailScreen() {
       </ScrollView>
 
       {/* Modal de acciones de pago */}
-      <Modal
+      <RNModal
         visible={selectedPayment !== null}
         transparent
         animationType="fade"
@@ -437,7 +429,20 @@ export default function DebtDetailScreen() {
             </View>
           </View>
         </TouchableOpacity>
-      </Modal>
+      </RNModal>
+
+      <Modal
+        visible={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Eliminar deuda"
+        message="Esta acción no se puede deshacer. Se eliminará la deuda y todas sus cuotas."
+        icon="🗑️"
+        accentColor={colors.error}
+        buttons={[
+          { text: 'Cancelar', style: 'cancel', onPress: () => setShowDeleteModal(false) },
+          { text: 'Eliminar', style: 'destructive', onPress: () => { setShowDeleteModal(false); confirmDeleteDebt(); } },
+        ]}
+      />
     </SafeAreaView>
   );
 }

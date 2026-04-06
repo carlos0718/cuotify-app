@@ -26,6 +26,10 @@ export default function CreateDebtScreen() {
 
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const clearError = (field: string) =>
+    setErrors((prev) => { const next = { ...prev }; delete next[field]; return next; });
 
   // Datos del acreedor
   const [creditorName, setCreditorName] = useState('');
@@ -70,28 +74,63 @@ export default function CreateDebtScreen() {
 
   const payment = calculatedPayment();
 
+  const validateStep1 = () => {
+    const newErrors: Record<string, string> = {};
+    if (!creditorName.trim()) {
+      newErrors.creditorName = 'El nombre es obligatorio';
+    } else if (creditorName.trim().length < 2) {
+      newErrors.creditorName = 'Ingresá al menos 2 caracteres';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateStep2 = () => {
+    const newErrors: Record<string, string> = {};
+    const p = parseFloat(principal);
+    if (!principal.trim()) {
+      newErrors.principal = 'El monto es obligatorio';
+    } else if (isNaN(p) || p <= 0) {
+      newErrors.principal = 'Ingresá un monto mayor a 0';
+    }
+    const r = parseFloat(interestRate);
+    if (!interestRate.trim()) {
+      newErrors.interestRate = 'La tasa de interés es obligatoria';
+    } else if (isNaN(r) || r < 0) {
+      newErrors.interestRate = 'Ingresá una tasa válida (≥ 0)';
+    } else if (r > 999) {
+      newErrors.interestRate = 'La tasa parece muy alta, verificá';
+    }
+    const t = parseInt(termValue);
+    if (!termValue.trim()) {
+      newErrors.termValue = 'El plazo es obligatorio';
+    } else if (isNaN(t) || t <= 0) {
+      newErrors.termValue = 'Ingresá un plazo mayor a 0';
+    }
+    if (!deliveryDate.trim()) {
+      newErrors.deliveryDate = 'La fecha es obligatoria';
+    } else if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) {
+      newErrors.deliveryDate = 'Formato incorrecto, usá AAAA-MM-DD';
+    } else if (isNaN(new Date(deliveryDate + 'T12:00:00').getTime())) {
+      newErrors.deliveryDate = 'La fecha ingresada no es válida';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleNext = () => {
     if (step === 1) {
-      if (!creditorName.trim()) {
-        showError('Error', 'Ingresa el nombre del acreedor');
-        return;
-      }
+      if (!validateStep1()) return;
       setStep(2);
     } else if (step === 2) {
-      if (!principal || !interestRate || !termValue) {
-        showError('Error', 'Completa todos los campos de la deuda');
-        return;
-      }
-      if (!deliveryDate || !/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) {
-        showError('Error', 'Ingresa la fecha de préstamo en formato AAAA-MM-DD');
-        return;
-      }
+      if (!validateStep2()) return;
       setStep(3);
     }
   };
 
   const handleBack = () => {
     if (step > 1) {
+      setErrors({});
       setStep(step - 1);
     } else {
       router.back();
@@ -197,12 +236,13 @@ export default function CreateDebtScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Nombre del acreedor *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, errors.creditorName && styles.inputError]}
                 placeholder="Ej: Banco Nación, Juan Pérez..."
                 placeholderTextColor={colors.text.disabled}
                 value={creditorName}
-                onChangeText={setCreditorName}
+                onChangeText={(v) => { setCreditorName(v); clearError('creditorName'); }}
               />
+              {errors.creditorName && <Text style={styles.errorText}>{errors.creditorName}</Text>}
             </View>
 
             <PhoneInput
@@ -274,38 +314,41 @@ export default function CreateDebtScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Monto de la deuda ({currencySymbol}) *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, errors.principal && styles.inputError]}
                 placeholder="5000"
                 placeholderTextColor={colors.text.disabled}
                 value={principal}
-                onChangeText={setPrincipal}
+                onChangeText={(v) => { setPrincipal(v); clearError('principal'); }}
                 keyboardType="decimal-pad"
               />
+              {errors.principal && <Text style={styles.errorText}>{errors.principal}</Text>}
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Tasa de interés anual (%) *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, errors.interestRate && styles.inputError]}
                 placeholder="24"
                 placeholderTextColor={colors.text.disabled}
                 value={interestRate}
-                onChangeText={setInterestRate}
+                onChangeText={(v) => { setInterestRate(v); clearError('interestRate'); }}
                 keyboardType="decimal-pad"
               />
+              {errors.interestRate && <Text style={styles.errorText}>{errors.interestRate}</Text>}
             </View>
 
             <View style={styles.row}>
               <View style={[styles.inputGroup, { flex: 1 }]}>
                 <Text style={styles.label}>Plazo *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, errors.termValue && styles.inputError]}
                   placeholder="6"
                   placeholderTextColor={colors.text.disabled}
                   value={termValue}
-                  onChangeText={setTermValue}
+                  onChangeText={(v) => { setTermValue(v); clearError('termValue'); }}
                   keyboardType="number-pad"
                 />
+                {errors.termValue && <Text style={styles.errorText}>{errors.termValue}</Text>}
               </View>
 
               <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -402,17 +445,20 @@ export default function CreateDebtScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Fecha de préstamo *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, errors.deliveryDate && styles.inputError]}
                 placeholder="AAAA-MM-DD"
                 placeholderTextColor={colors.text.disabled}
                 value={deliveryDate}
-                onChangeText={setDeliveryDate}
+                onChangeText={(v) => { setDeliveryDate(v); clearError('deliveryDate'); }}
               />
-              <Text style={styles.inputHint}>
-                {firstPaymentDate
-                  ? `Primer pago: ${firstPaymentDate} (+31 días)`
-                  : 'Formato: 2026-03-15 — el primer pago se calculará automáticamente'}
-              </Text>
+              {errors.deliveryDate
+                ? <Text style={styles.errorText}>{errors.deliveryDate}</Text>
+                : <Text style={styles.inputHint}>
+                    {firstPaymentDate
+                      ? `Primer pago: ${firstPaymentDate} (+31 días)`
+                      : 'Formato: 2026-03-15 — el primer pago se calculará automáticamente'}
+                  </Text>
+              }
             </View>
 
             {/* Configuración de penalización por mora */}
@@ -965,5 +1011,13 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     fontWeight: fontWeight.semiBold,
     color: colors.text.inverse,
+  },
+  inputError: {
+    borderColor: colors.error,
+  },
+  errorText: {
+    fontSize: fontSize.xs,
+    color: colors.error,
+    marginTop: spacing.xs,
   },
 });
