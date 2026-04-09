@@ -26,6 +26,8 @@ interface LoanDetail {
   end_date: string;
   status: 'active' | 'completed' | 'defaulted' | 'cancelled';
   borrower: Borrower | null;
+  lender: { id: string; full_name: string } | null;
+  notes?: string | null;
   grace_period_days: number;
   late_penalty_type: LatePenaltyType;
   late_penalty_rate: number;
@@ -40,7 +42,7 @@ function PaymentItem({
   penaltyConfig,
 }: {
   payment: Payment;
-  onPress: (payment: Payment, status: PaymentStatus, penaltyAmount: number) => void;
+  onPress?: (payment: Payment, status: PaymentStatus, penaltyAmount: number) => void;
   penaltyConfig: {
     gracePeriodDays: number;
     latePenaltyType: LatePenaltyType;
@@ -116,7 +118,8 @@ function PaymentItem({
       </View>
       <TouchableOpacity
         style={[styles.paymentStatus, { backgroundColor: config.bg }]}
-        onPress={() => onPress(payment, status, penaltyAmount)}
+        onPress={onPress ? () => onPress(payment, status, penaltyAmount) : undefined}
+        disabled={!onPress}
       >
         <Text style={[styles.paymentStatusText, { color: config.color }]}>
           {config.label}
@@ -127,7 +130,8 @@ function PaymentItem({
 }
 
 export default function LoanDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, readonly } = useLocalSearchParams<{ id: string; readonly?: string }>();
+  const isReadOnly = readonly === 'true';
   const [loan, setLoan] = useState<LoanDetail | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -322,7 +326,7 @@ export default function LoanDetailScreen() {
           <Text style={styles.backButtonText}>← Volver</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Detalle del Préstamo</Text>
-        {loan.status === 'completed' ? (
+        {!isReadOnly && loan.status === 'completed' ? (
           <TouchableOpacity onPress={handleDeleteLoan} style={styles.deleteButton} disabled={isProcessing}>
             <Text style={styles.deleteButtonText}>{isProcessing ? '...' : 'Eliminar'}</Text>
           </TouchableOpacity>
@@ -394,6 +398,22 @@ export default function LoanDetailScreen() {
             </View>
           </View>
 
+          {/* Creado por */}
+          {loan.lender && (
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>Registrado por</Text>
+              <Text style={styles.metaValue}>{loan.lender.full_name}</Text>
+            </View>
+          )}
+
+          {/* Descripción */}
+          {loan.notes ? (
+            <View style={styles.notesBox}>
+              <Text style={styles.notesLabel}>Descripción</Text>
+              <Text style={styles.notesText}>{loan.notes}</Text>
+            </View>
+          ) : null}
+
           <View style={styles.datesSection}>
             <View style={styles.dateItem}>
               <Text style={styles.dateLabel}>Entrega</Text>
@@ -417,8 +437,8 @@ export default function LoanDetailScreen() {
           </Text>
         </View>
 
-        {/* Acciones Premium */}
-        <View style={styles.premiumActions}>
+        {/* Acciones Premium (solo para el prestamista) */}
+        {!isReadOnly && <View style={styles.premiumActions}>
           <TouchableOpacity
             style={[styles.premiumButton, isExporting && styles.premiumButtonDisabled]}
             onPress={handleExportPDF}
@@ -437,7 +457,7 @@ export default function LoanDetailScreen() {
             <Text style={styles.premiumButtonIcon}>{premium ? '💬' : '🔒'}</Text>
             <Text style={styles.premiumButtonText}>WhatsApp</Text>
           </TouchableOpacity>
-        </View>
+        </View>}
 
         {/* Lista de pagos */}
         <View style={styles.paymentsSection}>
@@ -447,7 +467,7 @@ export default function LoanDetailScreen() {
               <PaymentItem
                 key={payment.id}
                 payment={payment}
-                onPress={handlePaymentPress}
+                onPress={isReadOnly ? undefined : handlePaymentPress}
                 penaltyConfig={{
                   gracePeriodDays: loan.grace_period_days || 7,
                   latePenaltyType: loan.late_penalty_type || 'none',
@@ -899,5 +919,41 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semiBold,
     color: colors.text.primary,
     marginTop: spacing.xs,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  metaLabel: {
+    fontSize: fontSize.sm,
+    color: colors.text.secondary,
+  },
+  metaValue: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.text.primary,
+  },
+  notesBox: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  notesLabel: {
+    fontSize: fontSize.xs,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  notesText: {
+    fontSize: fontSize.sm,
+    color: colors.text.primary,
+    lineHeight: 20,
   },
 });

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { getPersonalDebts, getDebtStats, getNextPendingPaymentDates } from '../../../services/supabase';
+import { getPersonalDebts, getDebtStats, getNextPendingPaymentDates, getLinkedLoans, getNextPendingPaymentDatesByLoan } from '../../../services/supabase';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { PersonalDebt } from '../../../services/supabase/personalDebts';
 
@@ -70,24 +70,34 @@ function DebtListCard({
 
 export default function DebtsScreen() {
   const [debts, setDebts] = useState<PersonalDebt[]>([]);
+  const [linkedLoans, setLinkedLoans] = useState<any[]>([]);
   const [stats, setStats] = useState({ totalDebts: 0, activeDebts: 0, totalToPay: 0 });
   const [nextPaymentDates, setNextPaymentDates] = useState<Record<string, string>>({});
+  const [nextLoanPaymentDates, setNextLoanPaymentDates] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
 
   const loadData = async () => {
     try {
-      const [debtsData, statsData] = await Promise.all([
+      const [debtsData, statsData, linkedLoansData] = await Promise.all([
         getPersonalDebts(),
         getDebtStats(),
+        getLinkedLoans(),
       ]);
       setDebts(debtsData);
       setStats(statsData);
-      // Traer la próxima cuota pendiente de cada deuda en una sola query
-      const activeIds = debtsData.filter(d => d.status === 'active').map(d => d.id);
-      const nextDates = await getNextPendingPaymentDates(activeIds);
+      setLinkedLoans(linkedLoansData);
+
+      const activeDebtIds = debtsData.filter(d => d.status === 'active').map(d => d.id);
+      const activeLoanIds = linkedLoansData.filter((l: any) => l.status === 'active').map((l: any) => l.id);
+
+      const [nextDates, nextLoanDates] = await Promise.all([
+        getNextPendingPaymentDates(activeDebtIds),
+        getNextPendingPaymentDatesByLoan(activeLoanIds),
+      ]);
       setNextPaymentDates(nextDates);
+      setNextLoanPaymentDates(nextLoanDates);
     } catch (error) {
       console.error('Error loading debts:', error);
     } finally {
@@ -120,6 +130,18 @@ export default function DebtsScreen() {
       currency: 'ARS',
       minimumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const getDueLoanInfo = (loan: any): string => {
+    if (loan.status === 'completed') return 'Completado';
+    const nextDueDateStr = nextLoanPaymentDates[loan.id];
+    if (!nextDueDateStr) return 'Al día';
+    const nextPayment = new Date(nextDueDateStr + 'T12:00:00');
+    const today = new Date();
+    const diffDays = Math.ceil((nextPayment.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return `Vencido hace ${Math.abs(diffDays)} días`;
+    if (diffDays === 0) return 'Vence hoy';
+    return `Próximo pago en ${diffDays} días`;
   };
 
   const getDueInfo = (debt: PersonalDebt): string => {
@@ -237,6 +259,38 @@ export default function DebtsScreen() {
               color={debt.color_code || colors.primary.main}
             />
           ))}
+
+          {/* Préstamos vinculados (solo lectura) */}
+          {linkedLoans.length > 0 && (
+            <>
+              <View style={styles.sectionDivider}>
+                <Text style={styles.sectionDividerText}>Préstamos donde soy prestatario</Text>
+              </View>
+              {linkedLoans.map((loan: any) => (
+                <TouchableOpacity
+                  key={loan.id}
+                  style={[styles.linkedLoanCard, { backgroundColor: (loan.color_code || colors.primary.main) + '15' }]}
+                  onPress={() => router.push(`/(main)/loans/${loan.id}?readonly=true` as any)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.linkedLoanBorder, { backgroundColor: loan.color_code || colors.primary.main }]} />
+                  <View style={styles.linkedLoanContent}>
+                    <View style={styles.linkedLoanHeader}>
+                      <View>
+                        <Text style={styles.linkedLoanName}>{loan.borrower?.full_name ?? 'Préstamo vinculado'}</Text>
+                        <Text style={styles.linkedLoanDue}>{getDueLoanInfo(loan)}</Text>
+                      </View>
+                      <View style={styles.readOnlyBadge}>
+                        <Text style={styles.readOnlyBadgeText}>Solo lectura</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.linkedLoanAmount}>{formatCurrency(loan.total_amount)}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+
           <View style={{ height: spacing.xl }} />
         </ScrollView>
       )}
@@ -477,5 +531,57 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     color: colors.text.secondary,
     textAlign: 'center',
+  },
+  sectionDivider: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  sectionDividerText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semiBold,
+    color: colors.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  linkedLoanCard: {
+    flexDirection: 'row',
+    borderRadius: borderRadius.xl,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
+    ...shadow.sm,
+  },
+  linkedLoanBorder: { width: 4 },
+  linkedLoanContent: { flex: 1, padding: spacing.md },
+  linkedLoanHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xs,
+  },
+  linkedLoanName: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.semiBold,
+    color: colors.text.primary,
+  },
+  linkedLoanDue: {
+    fontSize: fontSize.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  linkedLoanAmount: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: colors.text.primary,
+  },
+  readOnlyBadge: {
+    backgroundColor: colors.text.disabled + '30',
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  readOnlyBadgeText: {
+    fontSize: fontSize.xs,
+    color: colors.text.disabled,
   },
 });

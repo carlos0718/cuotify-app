@@ -62,14 +62,41 @@ export async function findBorrowerByPhone(lenderId: string, phone: string): Prom
 }
 
 /**
- * Obtiene un prestatario existente o crea uno nuevo
- * Busca primero por DNI, luego por teléfono
+ * Busca en profiles si existe un usuario registrado con el mismo DNI.
+ * Si existe, devuelve su ID para usarlo como linked_profile_id.
+ */
+async function findLinkedProfileId(dni: string | null | undefined): Promise<string | null> {
+  if (!dni?.trim()) return null;
+  const { data } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('dni', dni.trim())
+    .maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
+}
+
+/**
+ * Obtiene un prestatario existente o crea uno nuevo.
+ * Busca primero por DNI, luego por teléfono.
+ * Si el borrower existe o es nuevo y tiene DNI, intenta vincular
+ * automáticamente con el perfil de app que tenga ese mismo DNI.
  */
 export async function getOrCreateBorrower(data: BorrowerInsert): Promise<{ borrower: Borrower; isNew: boolean }> {
   // 1. Buscar por DNI si existe
   if (data.dni) {
     const existingByDni = await findBorrowerByDni(data.lender_id, data.dni);
     if (existingByDni) {
+      // Si aún no está vinculado, intentar linkear ahora
+      if (!existingByDni.linked_profile_id) {
+        const linkedId = await findLinkedProfileId(data.dni);
+        if (linkedId) {
+          await supabase
+            .from('borrowers')
+            .update({ linked_profile_id: linkedId } as never)
+            .eq('id', existingByDni.id);
+          return { borrower: { ...existingByDni, linked_profile_id: linkedId }, isNew: false };
+        }
+      }
       return { borrower: existingByDni, isNew: false };
     }
   }
@@ -82,8 +109,12 @@ export async function getOrCreateBorrower(data: BorrowerInsert): Promise<{ borro
     }
   }
 
-  // 3. Crear nuevo prestatario
-  const newBorrower = await createBorrower(data);
+  // 3. Crear nuevo prestatario — intentar vincular con perfil existente por DNI
+  const linkedProfileId = await findLinkedProfileId(data.dni);
+  const newBorrower = await createBorrower({
+    ...data,
+    linked_profile_id: linkedProfileId,
+  });
   return { borrower: newBorrower, isNew: true };
 }
 
@@ -103,12 +134,43 @@ export async function createLoan(data: LoanInsert): Promise<Loan> {
 }
 
 export async function getLoans() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
   const { data, error } = await supabase
     .from('loans')
-    .select(`
-      *,
-      borrower:borrowers(*)
-    `)
+    .select(`*, borrower:borrowers(*)`)
+    .eq('lender_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(handleSupabaseError(error));
+  return data || [];
+}
+
+/**
+ * Devuelve los préstamos donde el usuario autenticado es el prestatario vinculado.
+ * Se muestran en la sección Deudas como solo lectura.
+ */
+export async function getLinkedLoans() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // 1. Buscar borrowers donde linked_profile_id = usuario actual
+  const { data: borrowers, error: bError } = await supabase
+    .from('borrowers')
+    .select('id')
+    .eq('linked_profile_id', user.id);
+
+  if (bError) throw new Error(handleSupabaseError(bError));
+  if (!borrowers?.length) return [];
+
+  const borrowerIds = (borrowers as { id: string }[]).map((b) => b.id);
+
+  // 2. Obtener los préstamos de esos borrowers
+  const { data, error } = await supabase
+    .from('loans')
+    .select(`*, borrower:borrowers(*)`)
+    .in('borrower_id', borrowerIds)
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(handleSupabaseError(error));
@@ -178,16 +240,27 @@ export async function updateAllLoanColors(loanColors: string[]): Promise<number>
 export async function getLoanById(id: string) {
   const { data, error } = await supabase
     .from('loans')
-    .select(`
-      *,
-      borrower:borrowers(*),
-      payments(*)
-    `)
+    .select(`*, borrower:borrowers(*), payments(*)`)
     .eq('id', id)
     .single();
 
   if (error) throw new Error(handleSupabaseError(error));
-  return data as (Loan & { borrower: Borrower; payments: Payment[] }) | null;
+  if (!data) return null;
+
+  const loan = data as Loan & { borrower: Borrower; payments: Payment[]; lender: { id: string; full_name: string } | null };
+  loan.lender = null;
+
+  // Traer el nombre del prestamista por separado para evitar conflictos de RLS
+  if ((data as any).lender_id) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('id', (data as any).lender_id)
+      .maybeSingle();
+    if (profile) loan.lender = profile as { id: string; full_name: string };
+  }
+
+  return loan;
 }
 
 export async function getActiveLoans() {
