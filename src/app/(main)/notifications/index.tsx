@@ -8,6 +8,7 @@ import { setBadgeCount } from '../../../services/notifications/pushNotifications
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { Borrower } from '../../../types';
 import { PersonalDebt } from '../../../services/supabase/personalDebts';
+import { useAuthStore } from '../../../store/authStore';
 
 // Tipos
 type NotificationType = 'payment_reminder' | 'payment_overdue' | 'payment_today' | 'debt_reminder' | 'debt_overdue' | 'debt_today';
@@ -36,6 +37,7 @@ interface Notification {
   paymentId: string;
   loanId: string;
   debtId?: string;
+  isBorrowerLoan?: boolean;
 }
 
 interface DebtPaymentWithDebt {
@@ -140,6 +142,8 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { session } = useAuthStore();
+  const currentUserId = session?.user?.id;
 
   const formatCurrency = (amount: number, currency: 'ARS' | 'USD' = 'ARS') => {
     if (currency === 'USD') {
@@ -186,6 +190,7 @@ export default function NotificationsScreen() {
       const daysUntil = getDaysUntil(payment.due_date);
       const borrowerName = payment.loan?.borrower?.full_name || 'Sin nombre';
       const currency = (payment.loan?.currency || 'ARS') as 'ARS' | 'USD';
+      const isBorrowerLoan = !!(currentUserId && payment.loan?.borrower?.linked_profile_id === currentUserId);
       notifs.push({
         id: `overdue-${payment.id}`,
         type: 'payment_overdue',
@@ -195,6 +200,7 @@ export default function NotificationsScreen() {
         daysUntil,
         paymentId: payment.id,
         loanId: payment.loan?.id || '',
+        isBorrowerLoan,
       });
     });
 
@@ -203,6 +209,7 @@ export default function NotificationsScreen() {
       const daysUntil = getDaysUntil(payment.due_date);
       const borrowerName = payment.loan?.borrower?.full_name || 'Sin nombre';
       const currency = (payment.loan?.currency || 'ARS') as 'ARS' | 'USD';
+      const isBorrowerLoan = !!(currentUserId && payment.loan?.borrower?.linked_profile_id === currentUserId);
       let type: NotificationType = 'payment_reminder';
       let title = 'Recordatorio de pago';
       if (daysUntil === 0) { type = 'payment_today'; title = 'Pago vence hoy'; }
@@ -216,6 +223,7 @@ export default function NotificationsScreen() {
         daysUntil,
         paymentId: payment.id,
         loanId: payment.loan?.id || '',
+        isBorrowerLoan,
       });
     });
 
@@ -302,9 +310,12 @@ export default function NotificationsScreen() {
 
   const handleNotificationPress = (notification: Notification) => {
     if (notification.debtId) {
-      router.push(`/(main)/debts/${notification.debtId}` as never);
+      router.push(`/(main)/debts/${notification.debtId}?readonly=true` as never);
     } else if (notification.loanId) {
-      router.push(`/(main)/loans/${notification.loanId}`);
+      const path = notification.isBorrowerLoan
+        ? `/(main)/loans/${notification.loanId}?readonly=true`
+        : `/(main)/loans/${notification.loanId}`;
+      router.push(path as never);
     }
   };
 

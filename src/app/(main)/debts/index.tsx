@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { getPersonalDebts, getDebtStats, getNextPendingPaymentDates, getLinkedLoans, getNextPendingPaymentDatesByLoan } from '../../../services/supabase';
+import { getPersonalDebts, getDebtStats, getNextPendingPaymentDates, getLinkedLoans, getNextPendingPaymentDatesByLoan, getLinkedLoanPaymentStats } from '../../../services/supabase';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { PersonalDebt } from '../../../services/supabase/personalDebts';
 
@@ -71,7 +71,7 @@ function DebtListCard({
 export default function DebtsScreen() {
   const [debts, setDebts] = useState<PersonalDebt[]>([]);
   const [linkedLoans, setLinkedLoans] = useState<any[]>([]);
-  const [stats, setStats] = useState({ totalDebts: 0, activeDebts: 0, totalToPay: 0 });
+  const [stats, setStats] = useState({ totalDebts: 0, activeDebts: 0, totalToPay: 0, totalPaid: 0, remainingToPay: 0 });
   const [nextPaymentDates, setNextPaymentDates] = useState<Record<string, string>>({});
   const [nextLoanPaymentDates, setNextLoanPaymentDates] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -86,11 +86,20 @@ export default function DebtsScreen() {
         getLinkedLoans(),
       ]);
       setDebts(debtsData);
-      setStats(statsData);
       setLinkedLoans(linkedLoansData);
 
       const activeDebtIds = debtsData.filter(d => d.status === 'active').map(d => d.id);
       const activeLoanIds = linkedLoansData.filter((l: any) => l.status === 'active').map((l: any) => l.id);
+      const allLoanIds = linkedLoansData.map((l: any) => l.id);
+
+      const linkedStats = await getLinkedLoanPaymentStats(allLoanIds);
+      setStats({
+        totalDebts: statsData.totalDebts,
+        activeDebts: statsData.activeDebts,
+        totalToPay: statsData.totalToPay + linkedStats.totalToPay,
+        totalPaid: statsData.totalPaid + linkedStats.totalPaid,
+        remainingToPay: statsData.remainingToPay + linkedStats.remainingToPay,
+      });
 
       const [nextDates, nextLoanDates] = await Promise.all([
         getNextPendingPaymentDates(activeDebtIds),
@@ -191,39 +200,39 @@ export default function DebtsScreen() {
 
       {/* Resumen */}
       <View style={styles.summarySection}>
-        {/* Total a pagar - Full width */}
+        {/* Total comprometido - Full width */}
         <View style={[styles.summaryCard, styles.summaryCardPrimary]}>
           <View style={[styles.summaryIcon, styles.summaryIconLight]}>
             <Text style={styles.summaryIconText}>$</Text>
           </View>
           <View style={styles.summaryContent}>
-            <Text style={styles.summaryLabelLight}>Total a pagar</Text>
+            <Text style={styles.summaryLabelLight}>Total comprometido</Text>
             <Text style={styles.summaryValueLarge} numberOfLines={1} adjustsFontSizeToFit>
               {formatCurrency(stats.totalToPay)}
             </Text>
           </View>
         </View>
-        {/* Deudas y Activas - Side by side */}
+        {/* Ya pagué y Me resta - Side by side */}
         <View style={styles.summaryRow}>
-          <View style={[styles.summaryCard, styles.summaryCardSmall, styles.summaryCardInfo]}>
-            <View style={[styles.summaryIconSmall, styles.summaryIconInfo]}>
-              <Text style={styles.summaryIconTextSmall}>📋</Text>
-            </View>
-            <View>
-              <Text style={styles.summaryLabelDark}>Deudas</Text>
-              <Text style={[styles.summaryValueSmall, { color: colors.primary.main }]}>
-                {stats.totalDebts}
-              </Text>
-            </View>
-          </View>
           <View style={[styles.summaryCard, styles.summaryCardSmall, styles.summaryCardSuccess]}>
             <View style={[styles.summaryIconSmall, styles.summaryIconSuccess]}>
               <Text style={styles.summaryIconTextSmall}>✓</Text>
             </View>
-            <View>
-              <Text style={styles.summaryLabelDark}>Activas</Text>
-              <Text style={[styles.summaryValueSmall, { color: colors.success }]}>
-                {stats.activeDebts}
+            <View style={styles.summaryContent}>
+              <Text style={styles.summaryLabelDark}>Ya pagué</Text>
+              <Text style={[styles.summaryValueSmall, { color: colors.success }]} numberOfLines={1} adjustsFontSizeToFit>
+                {formatCurrency(stats.totalPaid)}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.summaryCard, styles.summaryCardSmall, styles.summaryCardWarning]}>
+            <View style={[styles.summaryIconSmall, styles.summaryIconWarning]}>
+              <Text style={styles.summaryIconTextSmall}>⏳</Text>
+            </View>
+            <View style={styles.summaryContent}>
+              <Text style={styles.summaryLabelDark}>Me resta</Text>
+              <Text style={[styles.summaryValueSmall, { color: colors.warning }]} numberOfLines={1} adjustsFontSizeToFit>
+                {formatCurrency(stats.remainingToPay)}
               </Text>
             </View>
           </View>
@@ -373,6 +382,9 @@ const styles = StyleSheet.create({
   summaryCardSuccess: {
     backgroundColor: colors.success + '15',
   },
+  summaryCardWarning: {
+    backgroundColor: colors.warning + '15',
+  },
   summaryRow: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -401,6 +413,9 @@ const styles = StyleSheet.create({
   },
   summaryIconSuccess: {
     backgroundColor: colors.success + '25',
+  },
+  summaryIconWarning: {
+    backgroundColor: colors.warning + '25',
   },
   summaryIconText: {
     fontSize: fontSize.lg,

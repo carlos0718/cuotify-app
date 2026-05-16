@@ -23,7 +23,7 @@ function PaymentItem({
 }: {
   payment: DebtPayment;
   currency: string;
-  onPress: (payment: DebtPayment, status: PaymentStatus) => void;
+  onPress?: (payment: DebtPayment, status: PaymentStatus) => void;
 }) {
   const today = new Date().toISOString().split('T')[0];
   const isOverdue = payment.status === 'pending' && payment.due_date < today;
@@ -75,7 +75,7 @@ function PaymentItem({
       </View>
       <TouchableOpacity
         style={[styles.paymentStatus, { backgroundColor: config.bg }]}
-        onPress={() => onPress(payment, status)}
+        onPress={onPress ? () => onPress(payment, status) : undefined}
       >
         <Text style={[styles.paymentStatusText, { color: config.color }]}>
           {config.label}
@@ -86,7 +86,8 @@ function PaymentItem({
 }
 
 export default function DebtDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, readonly } = useLocalSearchParams<{ id: string; readonly?: string }>();
+  const isReadOnly = readonly === 'true';
   const [debt, setDebt] = useState<PersonalDebt | null>(null);
   const [payments, setPayments] = useState<DebtPayment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -343,7 +344,7 @@ export default function DebtDetailScreen() {
                 key={payment.id}
                 payment={payment}
                 currency={debt.currency}
-                onPress={handlePaymentPress}
+                onPress={isReadOnly ? undefined : handlePaymentPress}
               />
             ))
           ) : (
@@ -389,34 +390,36 @@ export default function DebtDetailScreen() {
             </Text>
 
             <View style={styles.modalActions}>
-              {selectedPayment?.status === 'paid' ? (
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.modalButtonWarning]}
-                  onPress={handleRevertPayment}
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? (
-                    <ActivityIndicator color={colors.warning} size="small" />
-                  ) : (
-                    <Text style={[styles.modalButtonText, { color: colors.warning }]}>
-                      Revertir a Pendiente
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.modalButtonSuccess]}
-                  onPress={handleMarkPaid}
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? (
-                    <ActivityIndicator color={colors.success} size="small" />
-                  ) : (
-                    <Text style={[styles.modalButtonText, { color: colors.success }]}>
-                      Marcar como Pagado
-                    </Text>
-                  )}
-                </TouchableOpacity>
+              {!isReadOnly && (
+                selectedPayment?.status === 'paid' ? (
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalButtonWarning]}
+                    onPress={handleRevertPayment}
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? (
+                      <ActivityIndicator color={colors.warning} size="small" />
+                    ) : (
+                      <Text style={[styles.modalButtonText, { color: colors.warning }]}>
+                        Revertir a Pendiente
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalButtonSuccess]}
+                    onPress={handleMarkPaid}
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? (
+                      <ActivityIndicator color={colors.success} size="small" />
+                    ) : (
+                      <Text style={[styles.modalButtonText, { color: colors.success }]}>
+                        Marcar como Pagado
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )
               )}
 
               <TouchableOpacity

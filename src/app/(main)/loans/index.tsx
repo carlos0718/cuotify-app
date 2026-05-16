@@ -84,7 +84,7 @@ interface LoanWithBorrower {
 export default function LoansScreen() {
   const { isLender } = useAuthStore();
   const [loans, setLoans] = useState<LoanWithBorrower[]>([]);
-  const [stats, setStats] = useState({ totalLoans: 0, totalLent: 0, activeLoans: 0 });
+  const [stats, setStats] = useState({ totalLoans: 0, totalLent: 0, activeLoans: 0, completedLoans: 0 });
   const [nextPaymentDates, setNextPaymentDates] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -235,16 +235,16 @@ export default function LoansScreen() {
             </Text>
           </View>
         </View>
-        {/* Préstamos y Activos - Side by side */}
+        {/* Activos y Completados - Side by side */}
         <View style={styles.summaryRow}>
           <View style={[styles.summaryCard, styles.summaryCardSmall, styles.summaryCardInfo]}>
             <View style={[styles.summaryIconSmall, styles.summaryIconInfo]}>
               <Text style={styles.summaryIconTextSmall}>📋</Text>
             </View>
             <View>
-              <Text style={styles.summaryLabelDark}>Préstamos</Text>
+              <Text style={styles.summaryLabelDark}>Activos</Text>
               <Text style={[styles.summaryValueSmall, { color: colors.primary.main }]}>
-                {stats.totalLoans}
+                {stats.activeLoans}
               </Text>
             </View>
           </View>
@@ -253,9 +253,9 @@ export default function LoansScreen() {
               <Text style={styles.summaryIconTextSmall}>✓</Text>
             </View>
             <View>
-              <Text style={styles.summaryLabelDark}>Activos</Text>
+              <Text style={styles.summaryLabelDark}>Completados</Text>
               <Text style={[styles.summaryValueSmall, { color: colors.success }]}>
-                {stats.activeLoans}
+                {stats.completedLoans}
               </Text>
             </View>
           </View>

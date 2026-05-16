@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { useAuthStore } from '../../../store';
 import { getLoans, getLoanStats, getUpcomingPayments, getOverduePayments, getDebtStats, getNextPendingPaymentDatesByLoan } from '../../../services/supabase';
 import { colors, gradients, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
@@ -64,63 +64,55 @@ function formatShortCurrency(amount: number): string {
   return `$${amount.toFixed(0)}`;
 }
 
-// Componente de progreso circular para préstamos (lender)
-function CircularProgress({
-  percentage,
-  label,
-  valueText,
-  subtext,
-  size = 160,
-  strokeWidth = 12,
+function HeroMetricsCard({
+  lenderPct,
+  lenderAmount,
+  lenderRecovered,
+  debtPct,
+  debtTotal,
+  debtPaid,
+  showDebts,
 }: {
-  percentage: number;
-  label: string;
-  valueText: string;
-  subtext: string;
-  size?: number;
-  strokeWidth?: number;
+  lenderPct: number;
+  lenderAmount: string;
+  lenderRecovered: string;
+  debtPct: number;
+  debtTotal: string;
+  debtPaid: string;
+  showDebts: boolean;
 }) {
-  // Usamos SVG para mejor control del color del arco
-  const r = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * r;
-  const progress = circumference * (1 - percentage / 100);
-
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={size} height={size} style={{ position: 'absolute' }}>
-        {/* Pista de fondo */}
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          stroke="rgba(255,255,255,0.2)"
-          strokeWidth={strokeWidth}
-          fill="none"
-        />
-        {/* Arco de progreso - color ámbar para contraste sobre gradiente */}
-        {percentage > 0 && (
-          <Circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            stroke="#FBBF24"
-            strokeWidth={strokeWidth}
-            fill="none"
-            strokeDasharray={`${circumference}`}
-            strokeDashoffset={progress}
-            strokeLinecap="round"
-            transform={`rotate(-90, ${size / 2}, ${size / 2})`}
-          />
-        )}
-      </Svg>
-      {/* Texto central */}
-      <View style={{ alignItems: 'center', paddingHorizontal: 8 }}>
-        <Text style={styles.progressLabel}>{label}</Text>
-        <Text style={styles.progressValue} numberOfLines={1} adjustsFontSizeToFit>
-          {valueText}
+    <View style={styles.heroCard}>
+      {/* Columna izquierda: Préstamos */}
+      <View style={styles.heroColumn}>
+        <Text style={styles.heroColumnLabel}>PRÉSTAMOS</Text>
+        <Text style={styles.heroColumnAmount} numberOfLines={1} adjustsFontSizeToFit>
+          {lenderAmount}
         </Text>
-        <Text style={styles.progressSubtext} numberOfLines={1}>{subtext}</Text>
+        <Text style={styles.heroColumnSub}>total prestado</Text>
+        <View style={styles.heroProgressTrack}>
+          <View style={[styles.heroProgressFill, { width: `${lenderPct}%`, backgroundColor: '#FBBF24' }]} />
+        </View>
+        <Text style={styles.heroProgressLabel}>{lenderPct}% cobrado · {lenderRecovered}</Text>
       </View>
+
+      {/* Divisor vertical */}
+      {showDebts && <View style={styles.heroDivider} />}
+
+      {/* Columna derecha: Mis Deudas */}
+      {showDebts && (
+        <View style={styles.heroColumn}>
+          <Text style={styles.heroColumnLabel}>MIS DEUDAS</Text>
+          <Text style={styles.heroColumnAmount} numberOfLines={1} adjustsFontSizeToFit>
+            {debtTotal}
+          </Text>
+          <Text style={styles.heroColumnSub}>total adeudado</Text>
+          <View style={styles.heroProgressTrack}>
+            <View style={[styles.heroProgressFill, { width: `${debtPct}%`, backgroundColor: '#34D399' }]} />
+          </View>
+          <Text style={styles.heroProgressLabel}>{debtPct}% pagado · {debtPaid}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -388,47 +380,15 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            style={{ width: SCREEN_WIDTH, marginHorizontal: -spacing.lg }}
-            contentContainerStyle={styles.progressCarousel}
-          >
-            {/* Página 1: Préstamos (siempre visible) */}
-            <View style={[styles.progressPage, { width: SCREEN_WIDTH }]}>
-              <CircularProgress
-                percentage={lenderPercentage}
-                label="PRÉSTAMOS"
-                valueText={`${lenderPercentage}% COBRADO`}
-                subtext={stats.totalExpected > 0 ? `DE ${formatShortCurrency(stats.totalExpected)}` : 'SIN PRÉSTAMOS'}
-                size={190}
-                strokeWidth={14}
-              />
-            </View>
-
-            {/* Página 2: Mis Deudas */}
-            {hasDebtData && (
-              <View style={[styles.progressPage, { width: SCREEN_WIDTH }]}>
-                <CircularProgress
-                  percentage={debtPercentage}
-                  label="MIS DEUDAS"
-                  valueText={formatShortCurrency(debtStats!.totalToPay)}
-                  subtext={`${debtPercentage}% PAGADO`}
-                  size={190}
-                  strokeWidth={14}
-                />
-              </View>
-            )}
-          </ScrollView>
-
-          {/* Indicadores de página */}
-          {hasDebtData && (
-            <View style={styles.progressDots}>
-              <View style={[styles.progressDot, styles.progressDotActive]} />
-              <View style={styles.progressDot} />
-            </View>
-          )}
+          <HeroMetricsCard
+            lenderPct={lenderPercentage}
+            lenderAmount={stats.totalExpected > 0 ? formatShortCurrency(stats.totalExpected) : '$0'}
+            lenderRecovered={formatShortCurrency(stats.totalRecovered)}
+            debtPct={debtPercentage}
+            debtTotal={debtStats ? formatShortCurrency(debtStats.totalToPay) : '$0'}
+            debtPaid={debtStats ? formatShortCurrency(debtStats.totalPaid) : '$0'}
+            showDebts={hasDebtData}
+          />
         </SafeAreaView>
       </LinearGradient>
 
@@ -688,25 +648,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: fontWeight.bold,
     color: colors.text.inverse,
-  },
-  progressContainer: {
-    alignItems: 'center',
-    marginTop: spacing.xl,
-  },
-  progressLabel: {
-    fontSize: fontSize.sm,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: spacing.xs,
-  },
-  progressValue: {
-    fontSize: fontSize['2xl'],
-    fontWeight: fontWeight.bold,
-    color: colors.text.inverse,
-  },
-  progressSubtext: {
-    fontSize: fontSize.sm,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: spacing.xs,
   },
   content: {
     flex: 1,
@@ -1020,31 +961,57 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semiBold,
     color: colors.primary.main,
   },
-  progressCarousel: {
-    alignItems: 'center',
-  },
-  progressPage: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-  },
-  progressDots: {
+  heroCard: {
     flexDirection: 'row',
-    gap: spacing.xs,
-    justifyContent: 'center',
-    marginTop: spacing.sm,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: borderRadius.xl,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  heroColumn: {
+    flex: 1,
+    paddingHorizontal: spacing.sm,
+  },
+  heroColumnLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semiBold,
+    color: 'rgba(255,255,255,0.6)',
+    letterSpacing: 0.8,
     marginBottom: spacing.xs,
   },
-  progressDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.35)',
+  heroColumnAmount: {
+    fontSize: fontSize['2xl'],
+    fontWeight: fontWeight.bold,
+    color: colors.text.inverse,
+    marginBottom: 2,
   },
-  progressDotActive: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    width: 18,
-    borderRadius: 3,
+  heroColumnSub: {
+    fontSize: fontSize.xs,
+    color: 'rgba(255,255,255,0.55)',
+    marginBottom: spacing.sm,
+  },
+  heroProgressTrack: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+    marginBottom: spacing.xs,
+  },
+  heroProgressFill: {
+    height: '100%',
+    borderRadius: borderRadius.full,
+  },
+  heroProgressLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.65)',
+  },
+  heroDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginVertical: spacing.xs,
   },
   pieLegend: {
     marginTop: spacing.sm,

@@ -177,6 +177,29 @@ export async function getLinkedLoans() {
   return data || [];
 }
 
+export async function getLinkedLoanPaymentStats(loanIds: string[]): Promise<{
+  totalToPay: number;
+  totalPaid: number;
+  remainingToPay: number;
+}> {
+  if (!loanIds.length) return { totalToPay: 0, totalPaid: 0, remainingToPay: 0 };
+
+  const { data, error } = await supabase
+    .from('payments')
+    .select('total_amount, paid_amount, status')
+    .in('loan_id', loanIds);
+
+  if (error) throw new Error(handleSupabaseError(error));
+
+  const payments = (data || []) as { total_amount: number; paid_amount: number; status: string }[];
+  const totalToPay = payments.reduce((sum, p) => sum + (p.total_amount || 0), 0);
+  const totalPaid = payments
+    .filter(p => p.status === 'paid')
+    .reduce((sum, p) => sum + (p.paid_amount || p.total_amount || 0), 0);
+
+  return { totalToPay, totalPaid, remainingToPay: totalToPay - totalPaid };
+}
+
 /**
  * Obtiene el color del último préstamo creado
  * @returns El color del último préstamo o null si no hay préstamos
@@ -509,8 +532,10 @@ interface LoanStatsRow {
 }
 
 export async function getLoanStats() {
+  const { data: { user } } = await supabase.auth.getUser();
+
   const [loansResult, paymentsResult] = await Promise.all([
-    supabase.from('loans').select('status, total_amount, principal_amount'),
+    supabase.from('loans').select('status, total_amount, principal_amount').eq('lender_id', user?.id ?? ''),
     supabase.from('payments').select('paid_amount').eq('status', 'paid' as never),
   ]);
 
@@ -523,11 +548,13 @@ export async function getLoanStats() {
   );
   const totalExpected = loansList.reduce((sum, l) => sum + Number(l.total_amount), 0);
 
+  const activeLoans = loansList.filter(l => l.status === 'active');
+
   return {
-    totalLoans: loansList.length,
-    activeLoans: loansList.filter(l => l.status === 'active').length,
+    totalLoans: activeLoans.length,
+    activeLoans: activeLoans.length,
     completedLoans: loansList.filter(l => l.status === 'completed').length,
-    totalLent: loansList.reduce((sum, l) => sum + Number(l.principal_amount), 0),
+    totalLent: activeLoans.reduce((sum, l) => sum + Number(l.principal_amount), 0),
     totalExpected,
     totalRecovered,
   };
