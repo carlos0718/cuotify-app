@@ -7,11 +7,14 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Image,
+  Alert,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { calculateLoanPayment, calculateEndDate } from '../../../services/calculations';
-import { getOrCreateBorrower, createLoan, getPaymentsByLoan, getLastLoanColor } from '../../../services/supabase';
+import { getOrCreateBorrower, createLoan, getPaymentsByLoan, getLastLoanColor, uploadTransferProof } from '../../../services/supabase';
 import { schedulePaymentReminders } from '../../../services/notifications';
 import { useAuthStore, usePreferencesStore, useSubscriptionStore, FREE_LIMITS } from '../../../store';
 import { getActiveLoans } from '../../../services/supabase';
@@ -41,6 +44,7 @@ export default function CreateLoanScreen() {
   const [borrowerName, setBorrowerName] = useState('');
   const [borrowerDni, setBorrowerDni] = useState('');
   const [borrowerPhone, setBorrowerPhone] = useState('');
+  const [transferProofUri, setTransferProofUri] = useState<string | null>(null);
 
   // Datos del préstamo
   const [principal, setPrincipal] = useState('');
@@ -90,6 +94,50 @@ export default function CreateLoanScreen() {
   };
 
   const payment = calculatedPayment();
+
+  const handlePickImage = () => {
+    Alert.alert(
+      'Adjuntar comprobante',
+      'Seleccioná el origen de la imagen',
+      [
+        { text: 'Cámara', onPress: openCamera },
+        { text: 'Galería', onPress: openGallery },
+        { text: 'Cancelar', style: 'cancel' },
+      ]
+    );
+  };
+
+  const openCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      showError('Permiso requerido', 'Necesitamos acceso a la cámara');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsEditing: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setTransferProofUri(result.assets[0].uri);
+    }
+  };
+
+  const openGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      showError('Permiso requerido', 'Necesitamos acceso a la galería');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsEditing: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setTransferProofUri(result.assets[0].uri);
+    }
+  };
 
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {};
@@ -196,7 +244,17 @@ export default function CreateLoanScreen() {
       const lastColor = await getLastLoanColor();
       const loanColor = getNextLoanColor(lastColor);
 
-      // 4. Crear el préstamo con color pastel secuencial
+      // 4. Subir comprobante si existe
+      let transferProofUrl: string | null = null;
+      if (transferProofUri) {
+        try {
+          transferProofUrl = await uploadTransferProof(transferProofUri);
+        } catch {
+          // No bloquear la creación si falla la subida
+        }
+      }
+
+      // 5. Crear el préstamo con color pastel secuencial
       const currencySymbol = currency === 'ARS' ? '$' : 'US$';
       const isOpen = interestType === 'open';
       const newLoan = await createLoan({
@@ -219,6 +277,7 @@ export default function CreateLoanScreen() {
         late_penalty_type: latePenaltyType,
         color_code: loanColor,
         notes: notes.trim() || null,
+        transfer_proof_url: transferProofUrl,
       });
 
       // 5. Programar notificaciones de recordatorio para cada cuota
@@ -326,6 +385,23 @@ export default function CreateLoanScreen() {
               value={borrowerPhone}
               onChange={setBorrowerPhone}
             />
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Comprobante de transferencia</Text>
+              {transferProofUri ? (
+                <View style={styles.proofContainer}>
+                  <Image source={{ uri: transferProofUri }} style={styles.proofThumbnail} resizeMode="cover" />
+                  <TouchableOpacity style={styles.proofRemoveButton} onPress={() => setTransferProofUri(null)}>
+                    <Text style={styles.proofRemoveText}>Eliminar</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.proofPickerButton} onPress={handlePickImage}>
+                  <Text style={styles.proofPickerIcon}>📎</Text>
+                  <Text style={styles.proofPickerText}>Adjuntar comprobante (opcional)</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         )}
 
@@ -1202,5 +1278,43 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.error,
     marginTop: spacing.xs,
+  },
+  proofPickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    padding: spacing.md,
+  },
+  proofPickerIcon: {
+    fontSize: fontSize.lg,
+  },
+  proofPickerText: {
+    fontSize: fontSize.sm,
+    color: colors.text.secondary,
+  },
+  proofContainer: {
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  proofThumbnail: {
+    width: '100%',
+    height: 160,
+  },
+  proofRemoveButton: {
+    padding: spacing.sm,
+    alignItems: 'center',
+    backgroundColor: colors.error + '10',
+  },
+  proofRemoveText: {
+    fontSize: fontSize.sm,
+    color: colors.error,
+    fontWeight: fontWeight.medium,
   },
 });

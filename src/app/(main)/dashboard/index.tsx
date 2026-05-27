@@ -219,7 +219,7 @@ function StatCard({
 export default function DashboardScreen() {
   const { profile, isLender, isBorrower } = useAuthStore();
   const [loans, setLoans] = useState<LoanWithBorrower[]>([]);
-  const [stats, setStats] = useState({ totalLoans: 0, totalLent: 0, totalExpected: 0, totalRecovered: 0, activeLoans: 0, completedLoans: 0 });
+  const [stats, setStats] = useState({ totalLoans: 0, totalLent: 0, totalExpected: 0, totalRecovered: 0, totalPending: 0, activeLoans: 0, completedLoans: 0 });
   const [upcomingPayments, setUpcomingPayments] = useState<PaymentWithLoan[]>([]);
   const [overdueCount, setOverdueCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -448,7 +448,7 @@ export default function DashboardScreen() {
             {/* Por cobrar - Full width */}
             <StatCard
               title="Por cobrar"
-              value={formatCurrency(stats.totalExpected - stats.totalRecovered)}
+              value={formatCurrency(stats.totalPending)}
               icon="$"
               variant="primary"
               fullWidth
@@ -470,7 +470,7 @@ export default function DashboardScreen() {
             </View>
             {/* Balance neto - Solo si el usuario también es prestatario */}
             {isBorrower() && debtStats && (() => {
-              const netBalance = stats.totalLent - debtStats.remainingToPay;
+              const netBalance = stats.totalPending - debtStats.remainingToPay;
               return (
                 <StatCard
                   title="Balance neto"

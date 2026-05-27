@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal as RNModal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal as RNModal, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { getLoanById, getPaymentsByLoan, markPaymentAsPaid, revertPaymentToPending, deleteLoan } from '../../../services/supabase';
@@ -28,6 +28,7 @@ interface LoanDetail {
   borrower: Borrower | null;
   lender: { id: string; full_name: string } | null;
   notes?: string | null;
+  transfer_proof_url?: string | null;
   grace_period_days: number;
   late_penalty_type: LatePenaltyType;
   late_penalty_rate: number;
@@ -140,6 +141,7 @@ export default function LoanDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<{ payment: Payment; status: PaymentStatus; penaltyAmount: number } | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showProofModal, setShowProofModal] = useState(false);
   const { showSuccess, showError } = useToast();
   const { premium } = useSubscriptionStore();
 
@@ -414,6 +416,15 @@ export default function LoanDetailScreen() {
             </View>
           ) : null}
 
+          {/* Comprobante de transferencia */}
+          {loan.transfer_proof_url ? (
+            <TouchableOpacity style={styles.proofButton} onPress={() => setShowProofModal(true)}>
+              <Text style={styles.proofButtonIcon}>🧾</Text>
+              <Text style={styles.proofButtonText}>Ver comprobante de transferencia</Text>
+              <Text style={styles.proofButtonChevron}>›</Text>
+            </TouchableOpacity>
+          ) : null}
+
           <View style={styles.datesSection}>
             <View style={styles.dateItem}>
               <Text style={styles.dateLabel}>Entrega</Text>
@@ -572,6 +583,27 @@ export default function LoanDetailScreen() {
           { text: 'Eliminar', style: 'destructive', onPress: () => { setShowDeleteModal(false); confirmDeleteLoan(); } },
         ]}
       />
+
+      {/* Modal de comprobante a pantalla completa */}
+      <RNModal
+        visible={showProofModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowProofModal(false)}
+      >
+        <View style={styles.proofModalOverlay}>
+          <TouchableOpacity style={styles.proofModalClose} onPress={() => setShowProofModal(false)}>
+            <Text style={styles.proofModalCloseText}>✕ Cerrar</Text>
+          </TouchableOpacity>
+          {loan.transfer_proof_url ? (
+            <Image
+              source={{ uri: loan.transfer_proof_url }}
+              style={styles.proofModalImage}
+              resizeMode="contain"
+            />
+          ) : null}
+        </View>
+      </RNModal>
     </SafeAreaView>
   );
 }
@@ -955,5 +987,51 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.text.primary,
     lineHeight: 20,
+  },
+  proofButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.primary.main + '10',
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary.main + '30',
+  },
+  proofButtonIcon: {
+    fontSize: fontSize.lg,
+  },
+  proofButtonText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    color: colors.primary.main,
+  },
+  proofButtonChevron: {
+    fontSize: fontSize.xl,
+    color: colors.primary.main,
+  },
+  proofModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  proofModalClose: {
+    position: 'absolute',
+    top: 60,
+    right: spacing.lg,
+    zIndex: 10,
+    padding: spacing.sm,
+  },
+  proofModalCloseText: {
+    color: '#fff',
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.medium,
+  },
+  proofModalImage: {
+    width: '100%',
+    height: '80%',
   },
 });

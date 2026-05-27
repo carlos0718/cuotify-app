@@ -109,6 +109,7 @@ export interface Database {
           reminder_days_before: number;
           color_code: string;
           notes: string | null;
+          transfer_proof_url: string | null;
           grace_period_days: number;
           late_penalty_rate: number;
           late_penalty_type: 'none' | 'fixed' | 'daily' | 'weekly';
@@ -135,6 +136,7 @@ export interface Database {
           reminder_days_before?: number;
           color_code?: string;
           notes?: string | null;
+          transfer_proof_url?: string | null;
           grace_period_days?: number;
           late_penalty_rate?: number;
           late_penalty_type?: 'none' | 'fixed' | 'daily' | 'weekly';
@@ -161,6 +163,7 @@ export interface Database {
           reminder_days_before?: number;
           color_code?: string;
           notes?: string | null;
+          transfer_proof_url?: string | null;
           grace_period_days?: number;
           late_penalty_rate?: number;
           late_penalty_type?: 'none' | 'fixed' | 'daily' | 'weekly';

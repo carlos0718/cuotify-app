@@ -4,3 +4,4 @@ export * from './loans';
 export * from './personalDebts';
 export * from './notificationPreferences';
 export * from './export';
+export * from './storage';

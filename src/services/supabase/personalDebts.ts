@@ -26,6 +26,7 @@ export interface PersonalDebt {
   installment_amount: number;
   status: 'active' | 'completed' | 'cancelled';
   color_code?: string;
+  transfer_proof_url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +64,7 @@ export interface CreatePersonalDebtInput {
   late_penalty_rate?: number;
   grace_period_days?: number;
   color_code?: string;
+  transfer_proof_url?: string | null;
 }
 
 // =============================================

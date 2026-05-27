@@ -526,6 +526,7 @@ export async function getOverduePayments() {
 // =============================================
 
 interface LoanStatsRow {
+  id: string;
   status: string;
   total_amount: number;
   principal_amount: number;
@@ -534,17 +535,30 @@ interface LoanStatsRow {
 export async function getLoanStats() {
   const { data: { user } } = await supabase.auth.getUser();
 
-  const [loansResult, paymentsResult] = await Promise.all([
-    supabase.from('loans').select('status, total_amount, principal_amount').eq('lender_id', user?.id ?? ''),
-    supabase.from('payments').select('paid_amount').eq('status', 'paid' as never),
-  ]);
+  const loansResult = await supabase
+    .from('loans')
+    .select('id, status, total_amount, principal_amount')
+    .eq('lender_id', user?.id ?? '');
 
   if (loansResult.error) throw new Error(handleSupabaseError(loansResult.error));
 
   const loansList = (loansResult.data || []) as LoanStatsRow[];
-  const totalRecovered = ((paymentsResult.data || []) as { paid_amount: number }[]).reduce(
-    (sum, p) => sum + Number(p.paid_amount),
-    0
+  const loanIds = loansList.map(l => l.id);
+
+  const [paidResult, pendingResult] = await Promise.all([
+    loanIds.length
+      ? supabase.from('payments').select('paid_amount').eq('status', 'paid' as never).in('loan_id', loanIds)
+      : Promise.resolve({ data: [], error: null }),
+    loanIds.length
+      ? supabase.from('payments').select('total_amount, penalty_amount').eq('status', 'pending' as never).in('loan_id', loanIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const totalRecovered = ((paidResult.data || []) as { paid_amount: number }[]).reduce(
+    (sum, p) => sum + Number(p.paid_amount), 0
+  );
+  const totalPending = ((pendingResult.data || []) as { total_amount: number; penalty_amount: number }[]).reduce(
+    (sum, p) => sum + Number(p.total_amount) + Number(p.penalty_amount || 0), 0
   );
   const totalExpected = loansList.reduce((sum, l) => sum + Number(l.total_amount), 0);
 
@@ -557,6 +571,7 @@ export async function getLoanStats() {
     totalLent: activeLoans.reduce((sum, l) => sum + Number(l.principal_amount), 0),
     totalExpected,
     totalRecovered,
+    totalPending,
   };
 }
 

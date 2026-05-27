@@ -2,6 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npx expo:*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\charly\\Desktop\\workspace\\Cursos-onLine\\HTML"
     ]
   }
 }
