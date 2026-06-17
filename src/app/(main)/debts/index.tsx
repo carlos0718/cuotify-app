@@ -171,9 +171,14 @@ export default function DebtsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Mis Deudas</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => router.push('/(main)/debts/create' as any)}>
-          <Text style={styles.addButtonText}>+ Nuevo</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.analyzeButton} onPress={() => router.push('/(main)/debts/analyze' as any)}>
+            <Text style={styles.analyzeButtonText}>✨ IA</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addButton} onPress={() => router.push('/(main)/debts/create' as any)}>
+            <Text style={styles.addButtonText}>+ Nuevo</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Filtros */}
@@ -323,6 +328,24 @@ const styles = StyleSheet.create({
     fontSize: fontSize['2xl'],
     fontWeight: fontWeight.bold,
     color: colors.text.primary,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  analyzeButton: {
+    backgroundColor: colors.secondary.main + '20',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.secondary.main + '40',
+  },
+  analyzeButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semiBold,
+    color: colors.secondary.main,
   },
   addButton: {
     backgroundColor: colors.primary.main,

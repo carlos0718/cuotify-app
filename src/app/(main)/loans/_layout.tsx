@@ -7,6 +7,7 @@ export default function LoansLayout() {
       <Stack.Screen name="[id]" />
       <Stack.Screen name="create" />
       <Stack.Screen name="link" />
+      <Stack.Screen name="analyze" />
     </Stack>
   );
 }

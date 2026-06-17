@@ -5,6 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { getUpcomingPayments, getOverduePayments } from '../../../services/supabase';
 import { getUpcomingDebtPayments, getOverdueDebtPayments } from '../../../services/supabase/personalDebts';
 import { setBadgeCount } from '../../../services/notifications/pushNotifications';
+import { getReadIds, markAsRead, markAllAsRead } from '../../../services/notifications/readNotifications';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { Borrower } from '../../../types';
 import { PersonalDebt } from '../../../services/supabase/personalDebts';
@@ -38,6 +39,7 @@ interface Notification {
   loanId: string;
   debtId?: string;
   isBorrowerLoan?: boolean;
+  isRead?: boolean;
 }
 
 interface DebtPaymentWithDebt {
@@ -97,31 +99,36 @@ function NotificationItem({
   const config = notificationConfig[notification.type];
   const isUrgent = notification.type === 'payment_overdue' || notification.type === 'payment_today'
     || notification.type === 'debt_overdue' || notification.type === 'debt_today';
+  const isRead = notification.isRead === true;
 
   return (
     <TouchableOpacity
       style={[
         styles.notificationItem,
-        isUrgent && styles.notificationItemUrgent,
+        isUrgent && !isRead && styles.notificationItemUrgent,
+        isRead && styles.notificationItemRead,
       ]}
       activeOpacity={0.7}
       onPress={onPress}
     >
-      <View style={[styles.iconContainer, { backgroundColor: config.bgColor }]}>
-        <Text style={styles.icon}>{config.icon}</Text>
+      <View style={[styles.iconContainer, { backgroundColor: isRead ? config.bgColor + '80' : config.bgColor }]}>
+        <Text style={[styles.icon, isRead && styles.iconRead]}>{config.icon}</Text>
       </View>
       <View style={styles.notificationContent}>
         <View style={styles.notificationHeader}>
-          <Text style={[styles.notificationTitle, isUrgent && styles.textBold]}>
+          <Text style={[styles.notificationTitle, isUrgent && !isRead && styles.textBold, isRead && styles.textRead]}>
             {notification.title}
           </Text>
-          <Text style={styles.notificationTime}>{notification.time}</Text>
+          <View style={styles.notificationTimeRow}>
+            {!isRead && <View style={styles.unreadDot} />}
+            <Text style={styles.notificationTime}>{notification.time}</Text>
+          </View>
         </View>
-        <Text style={styles.notificationBody} numberOfLines={2}>
+        <Text style={[styles.notificationBody, isRead && styles.textRead]} numberOfLines={2}>
           {notification.body}
         </Text>
       </View>
-      {isUrgent && <View style={[styles.urgentDot, { backgroundColor: config.color }]} />}
+      {isUrgent && !isRead && <View style={[styles.urgentDot, { backgroundColor: config.color }]} />}
     </TouchableOpacity>
   );
 }
@@ -140,6 +147,7 @@ function EmptyState() {
 
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { session } = useAuthStore();
@@ -272,11 +280,12 @@ export default function NotificationsScreen() {
 
   const loadData = async () => {
     try {
-      const [upcomingData, overdueData, upcomingDebtData, overdueDebtData] = await Promise.all([
+      const [upcomingData, overdueData, upcomingDebtData, overdueDebtData, storedReadIds] = await Promise.all([
         getUpcomingPayments(14),
         getOverduePayments(),
         getUpcomingDebtPayments(14),
         getOverdueDebtPayments(),
+        getReadIds(),
       ]);
 
       const notifs = transformToNotifications(
@@ -286,6 +295,7 @@ export default function NotificationsScreen() {
         overdueDebtData as unknown as DebtPaymentWithDebt[]
       );
       setNotifications(notifs);
+      setReadIds(storedReadIds);
 
       // Limpiar badge del sistema (iOS)
       setBadgeCount(0).catch(() => {});
@@ -308,7 +318,11 @@ export default function NotificationsScreen() {
     loadData();
   };
 
-  const handleNotificationPress = (notification: Notification) => {
+  const handleNotificationPress = async (notification: Notification) => {
+    if (!readIds.has(notification.id)) {
+      await markAsRead(notification.id);
+      setReadIds(prev => new Set([...prev, notification.id]));
+    }
     if (notification.debtId) {
       router.push(`/(main)/debts/${notification.debtId}?readonly=true` as never);
     } else if (notification.loanId) {
@@ -319,12 +333,20 @@ export default function NotificationsScreen() {
     }
   };
 
-  // Agrupar notificaciones
-  const overdueNotifs = notifications.filter(n => n.type === 'payment_overdue' || n.type === 'debt_overdue');
-  const todayNotifs = notifications.filter(n => n.type === 'payment_today' || n.type === 'debt_today');
-  const upcomingNotifs = notifications.filter(n => n.type === 'payment_reminder' || n.type === 'debt_reminder');
+  const handleMarkAllAsRead = async () => {
+    const allIds = notifications.map(n => n.id);
+    await markAllAsRead(allIds);
+    setReadIds(new Set(allIds));
+  };
 
-  const urgentCount = overdueNotifs.length + todayNotifs.length;
+  // Agrupar notificaciones con estado leído
+  const notificationsWithRead = notifications.map(n => ({ ...n, isRead: readIds.has(n.id) }));
+  const overdueNotifs = notificationsWithRead.filter(n => n.type === 'payment_overdue' || n.type === 'debt_overdue');
+  const todayNotifs = notificationsWithRead.filter(n => n.type === 'payment_today' || n.type === 'debt_today');
+  const upcomingNotifs = notificationsWithRead.filter(n => n.type === 'payment_reminder' || n.type === 'debt_reminder');
+
+  const unreadCount = notificationsWithRead.filter(n => !n.isRead).length;
+  const urgentCount = overdueNotifs.filter(n => !n.isRead).length + todayNotifs.filter(n => !n.isRead).length;
 
   if (isLoading) {
     return (
@@ -344,15 +366,22 @@ export default function NotificationsScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Alertas</Text>
-          {urgentCount > 0 && (
+          {unreadCount > 0 && (
             <Text style={styles.subtitle}>
-              {urgentCount} {urgentCount === 1 ? 'urgente' : 'urgentes'}
+              {unreadCount} sin leer
             </Text>
           )}
         </View>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-          <Text style={styles.closeButtonText}>✕</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {unreadCount > 0 && (
+            <TouchableOpacity onPress={handleMarkAllAsRead} style={styles.markAllButton}>
+              <Text style={styles.markAllText}>Marcar todas</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+            <Text style={styles.closeButtonText}>✕</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {notifications.length === 0 ? (
@@ -555,5 +584,41 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  markAllButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary.main + '15',
+  },
+  markAllText: {
+    fontSize: fontSize.xs,
+    color: colors.primary.main,
+    fontWeight: fontWeight.medium,
+  },
+  notificationItemRead: {
+    opacity: 0.6,
+  },
+  notificationTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  unreadDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary.main,
+  },
+  iconRead: {
+    opacity: 0.5,
+  },
+  textRead: {
+    color: colors.text.disabled,
   },
 });

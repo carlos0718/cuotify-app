@@ -6,6 +6,7 @@ import { router, useFocusEffect } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { useAuthStore } from '../../../store';
 import { getLoans, getLoanStats, getUpcomingPayments, getOverduePayments, getDebtStats, getNextPendingPaymentDatesByLoan } from '../../../services/supabase';
+import { getReadIds } from '../../../services/notifications';
 import { colors, gradients, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { Borrower } from '../../../types';
 import { DebtStats } from '../../../services/supabase/personalDebts';
@@ -222,6 +223,7 @@ export default function DashboardScreen() {
   const [stats, setStats] = useState({ totalLoans: 0, totalLent: 0, totalExpected: 0, totalRecovered: 0, totalPending: 0, activeLoans: 0, completedLoans: 0 });
   const [upcomingPayments, setUpcomingPayments] = useState<PaymentWithLoan[]>([]);
   const [overdueCount, setOverdueCount] = useState(0);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -231,18 +233,28 @@ export default function DashboardScreen() {
 
   const loadData = async () => {
     try {
-      const [loansData, statsData, paymentsData, overdueData, debtStatsData] = await Promise.all([
+      const [loansData, statsData, paymentsData, overdueData, debtStatsData, readIds] = await Promise.all([
         getLoans(),
         getLoanStats(),
         getUpcomingPayments(7),
         getOverduePayments(),
         getDebtStats(),
+        getReadIds(),
       ]);
       setLoans(loansData as LoanWithBorrower[]);
       setStats(statsData);
       setUpcomingPayments(paymentsData as PaymentWithLoan[]);
-      setOverdueCount((overdueData as PaymentWithLoan[]).length);
+      const overduePayments = overdueData as PaymentWithLoan[];
+      setOverdueCount(overduePayments.length);
       setDebtStats(debtStatsData);
+
+      // Calcular notificaciones no leídas
+      const upcomingIds = (paymentsData as PaymentWithLoan[]).map(p => `upcoming-${p.id}`);
+      const overdueIds = overduePayments.map(p => `overdue-${p.id}`);
+      const allNotifIds = [...upcomingIds, ...overdueIds];
+      const unread = allNotifIds.filter(id => !readIds.has(id)).length;
+      setUnreadNotifCount(unread);
+
       const activeIds = (loansData as LoanWithBorrower[]).filter(l => l.status === 'active').map(l => l.id);
       const nextDates = await getNextPendingPaymentDatesByLoan(activeIds);
       setNextPaymentDates(nextDates);
@@ -370,10 +382,10 @@ export default function DashboardScreen() {
               onPress={() => router.push('/(main)/notifications')}
             >
               <BellIcon />
-              {(upcomingPayments.length + overdueCount) > 0 && (
+              {unreadNotifCount > 0 && (
                 <View style={styles.notificationBadge}>
                   <Text style={styles.notificationBadgeText}>
-                    {upcomingPayments.length + overdueCount > 9 ? '9+' : upcomingPayments.length + overdueCount}
+                    {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
                   </Text>
                 </View>
               )}

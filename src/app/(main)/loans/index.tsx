@@ -174,15 +174,25 @@ export default function LoansScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Préstamos</Text>
-        {isLender() ? (
-          <TouchableOpacity style={styles.addButton} onPress={handleNewLoan}>
-            <Text style={styles.addButtonText}>+ Nuevo</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.addButton} onPress={handleLinkLoan}>
-            <Text style={styles.addButtonText}>Vincular</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerActions}>
+          {isLender() && (
+            <TouchableOpacity
+              style={styles.analyzeButton}
+              onPress={() => router.push('/(main)/loans/analyze' as never)}
+            >
+              <Text style={styles.analyzeButtonText}>✨ IA</Text>
+            </TouchableOpacity>
+          )}
+          {isLender() ? (
+            <TouchableOpacity style={styles.addButton} onPress={handleNewLoan}>
+              <Text style={styles.addButtonText}>+ Nuevo</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.addButton} onPress={handleLinkLoan}>
+              <Text style={styles.addButtonText}>Vincular</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Buscador */}
@@ -316,6 +326,24 @@ const styles = StyleSheet.create({
     fontSize: fontSize['2xl'],
     fontWeight: fontWeight.bold,
     color: colors.text.primary,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  analyzeButton: {
+    backgroundColor: colors.secondary.main + '20',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.secondary.main + '40',
+  },
+  analyzeButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semiBold,
+    color: colors.secondary.main,
   },
   addButton: {
     backgroundColor: colors.primary.main,

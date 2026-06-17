@@ -180,7 +180,7 @@ export default function DebtDetailScreen() {
     try {
       await deletePersonalDebt(debt.id);
       showSuccess('Deuda eliminada', 'La deuda ha sido eliminada correctamente');
-      router.back();
+      router.replace('/(main)/debts');
     } catch (error) {
       showError('Error', error instanceof Error ? error.message : 'No se pudo eliminar la deuda');
     } finally {
@@ -223,7 +223,7 @@ export default function DebtDetailScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => router.replace('/(main)/debts')} style={styles.backButton}>
             <Text style={styles.backButtonText}>← Volver</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Error</Text>
@@ -245,7 +245,7 @@ export default function DebtDetailScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.replace('/(main)/debts')} style={styles.backButton}>
           <Text style={styles.backButtonText}>← Volver</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Detalle de Deuda</Text>
