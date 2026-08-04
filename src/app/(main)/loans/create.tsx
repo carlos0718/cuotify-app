@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Calendar, DateData } from 'react-native-calendars';
 import { router } from 'expo-router';
 import { calculateLoanPayment, calculateEndDate } from '../../../services/calculations';
 import { getOrCreateBorrower, createLoan, getPaymentsByLoan, getLastLoanColor, uploadTransferProof } from '../../../services/supabase';
@@ -72,6 +73,7 @@ export default function CreateLoanScreen() {
   })();
 
   const [showInterestGuide, setShowInterestGuide] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Configuración de penalización por mora
   const [latePenaltyType, setLatePenaltyType] = useState<LatePenaltyType>('none');
@@ -84,7 +86,7 @@ export default function CreateLoanScreen() {
 
     const result = calculateLoanPayment({
       principalAmount: parseFloat(principal),
-      annualInterestRate: parseFloat(interestRate),
+      annualInterestRate: parseFloat(interestRate) * 12,
       termValue: parseInt(termValue),
       termType,
       interestType,
@@ -261,7 +263,7 @@ export default function CreateLoanScreen() {
         lender_id: user.id,
         borrower_id: borrower.id,
         principal_amount: parseFloat(principal),
-        interest_rate: parseFloat(interestRate),
+        interest_rate: parseFloat(interestRate) * 12,
         term_value: isOpen ? 0 : parseInt(termValue),
         term_type: termType,
         interest_type: interestType,
@@ -465,7 +467,7 @@ export default function CreateLoanScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Tasa de interés anual (%) *</Text>
+              <Text style={styles.label}>Tasa de interés mensual (%) *</Text>
               <TextInput
                 style={[styles.input, errors.interestRate && styles.inputError]}
                 placeholder="24"
@@ -603,22 +605,55 @@ export default function CreateLoanScreen() {
             {/* Fecha de préstamo */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Fecha de préstamo *</Text>
-              <TextInput
-                style={[styles.input, errors.deliveryDate && styles.inputError]}
-                placeholder="AAAA-MM-DD"
-                placeholderTextColor={colors.text.disabled}
-                value={deliveryDateInput}
-                onChangeText={(v) => { setDeliveryDateInput(v); clearError('deliveryDate'); }}
-              />
+              <TouchableOpacity
+                style={[styles.input, styles.datePickerButton, errors.deliveryDate && styles.inputError]}
+                onPress={() => setShowDatePicker(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={deliveryDateInput ? styles.datePickerText : styles.datePickerPlaceholder}>
+                  {deliveryDateInput || 'Seleccioná una fecha'}
+                </Text>
+                <Text style={styles.datePickerIcon}>📅</Text>
+              </TouchableOpacity>
               {errors.deliveryDate
                 ? <Text style={styles.errorText}>{errors.deliveryDate}</Text>
                 : <Text style={styles.inputHint}>
                     {firstPaymentDateCalc
                       ? `Primera cuota: ${firstPaymentDateCalc} (+1 ${termType === 'months' ? 'mes' : 'semana'})`
-                      : 'Formato: 2026-03-15'}
+                      : 'Tocá para elegir la fecha'}
                   </Text>
               }
             </View>
+
+            {/* Modal calendario */}
+            <Modal
+              visible={showDatePicker}
+              onClose={() => setShowDatePicker(false)}
+              title="Fecha de préstamo"
+              icon="📅"
+              buttons={[{ text: 'Cerrar', style: 'secondary', onPress: () => setShowDatePicker(false) }]}
+            >
+              <Calendar
+                current={deliveryDateInput || new Date().toISOString().split('T')[0]}
+                onDayPress={(day: DateData) => {
+                  setDeliveryDateInput(day.dateString);
+                  clearError('deliveryDate');
+                  setShowDatePicker(false);
+                }}
+                markedDates={deliveryDateInput ? { [deliveryDateInput]: { selected: true, selectedColor: colors.primary.main } } : {}}
+                theme={{
+                  backgroundColor: 'transparent',
+                  calendarBackground: 'transparent',
+                  selectedDayBackgroundColor: colors.primary.main,
+                  selectedDayTextColor: colors.text.inverse,
+                  todayTextColor: colors.primary.main,
+                  dayTextColor: colors.text.primary,
+                  textDisabledColor: colors.text.disabled,
+                  monthTextColor: colors.text.primary,
+                  arrowColor: colors.primary.main,
+                }}
+              />
+            </Modal>
 
             {/* Configuración de penalización por mora */}
             <View style={styles.penaltySection}>
@@ -838,7 +873,7 @@ export default function CreateLoanScreen() {
               <View style={styles.confirmDivider} />
 
               <Text style={styles.confirmLabel}>Interés</Text>
-              <Text style={styles.confirmValue}>{interestRate}% anual</Text>
+              <Text style={styles.confirmValue}>{interestRate}% mensual</Text>
 
               <View style={styles.confirmDivider} />
 
@@ -1273,6 +1308,22 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: colors.error,
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  datePickerText: {
+    fontSize: fontSize.base,
+    color: colors.text.primary,
+  },
+  datePickerPlaceholder: {
+    fontSize: fontSize.base,
+    color: colors.text.disabled,
+  },
+  datePickerIcon: {
+    fontSize: fontSize.lg,
   },
   errorText: {
     fontSize: fontSize.xs,
