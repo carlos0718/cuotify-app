@@ -4,7 +4,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -12,19 +11,8 @@ import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../
 
 export default function SecuritySettingsScreen() {
   const handleChangePassword = () => {
-    Alert.alert(
-      'Cambiar contraseña',
-      '¿Quieres recibir un enlace para cambiar tu contraseña?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Enviar enlace',
-          onPress: () => {
-            router.push('/(auth)/forgot-password');
-          },
-        },
-      ]
-    );
+    // La sesión ya está activa, se actualiza directo sin enlace por correo
+    router.push('/(auth)/reset-password');
   };
 
   return (
@@ -55,7 +43,7 @@ export default function SecuritySettingsScreen() {
             <View style={styles.itemContent}>
               <Text style={styles.itemTitle}>Cambiar contraseña</Text>
               <Text style={styles.itemSubtitle}>
-                Recibe un enlace para actualizar tu contraseña
+                Actualiza tu contraseña
               </Text>
             </View>
             <Text style={styles.arrow}>→</Text>

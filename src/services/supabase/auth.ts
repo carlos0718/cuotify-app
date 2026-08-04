@@ -109,11 +109,24 @@ export async function getCurrentProfile() {
   }
 }
 
-// Recuperar contraseña
+// Enviar el código de recuperación (OTP de 6 dígitos) al correo
 export async function resetPassword(email: string) {
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'cuotify://reset-password',
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) throw error;
+  } catch (error) {
+    throw new Error(handleSupabaseError(error));
+  }
+}
+
+// Verificar el código de recuperación e iniciar sesión temporal para poder
+// actualizar la contraseña
+export async function verifyRecoveryOtp(email: string, token: string) {
+  try {
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'recovery',
     });
     if (error) throw error;
   } catch (error) {

@@ -8,20 +8,24 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, router } from 'expo-router';
-import { resetPassword } from '../../services/supabase/auth';
+import { resetPassword, verifyRecoveryOtp } from '../../services/supabase/auth';
 import { colors, gradients, spacing, borderRadius, fontSize, fontWeight } from '../../theme';
 import { useToast } from '../../components';
 import { validateEmail } from '../../utils';
 
 export default function ForgotPasswordScreen() {
+  const [step, setStep] = useState(1); // 1: email, 2: código
   const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { showSuccess, showError } = useToast();
 
-  const handleResetPassword = async () => {
+  const handleSendCode = async () => {
     if (!email.trim()) {
       showError('Error', 'Por favor ingresa tu correo electrónico');
       return;
@@ -38,14 +42,49 @@ export default function ForgotPasswordScreen() {
 
     try {
       await resetPassword(email.trim());
-      showSuccess('Correo enviado', 'Revisa tu bandeja de entrada');
-      setTimeout(() => {
-        router.back();
-      }, 2000);
+      showSuccess('Código enviado', 'Revisa tu correo e ingresa el código de 8 dígitos');
+      setStep(2);
     } catch (error) {
       showError(
         'Error',
-        error instanceof Error ? error.message : 'No se pudo enviar el correo'
+        error instanceof Error ? error.message : 'No se pudo enviar el código'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (code.trim().length !== 8) {
+      showError('Error', 'Ingresa el código de 8 dígitos');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await verifyRecoveryOtp(email.trim(), code.trim());
+      // verifyOtp deja una sesión activa; la pantalla de reset-password la usa
+      router.replace('/(auth)/reset-password');
+    } catch (error) {
+      showError(
+        'Código inválido',
+        error instanceof Error ? error.message : 'El código es incorrecto o expiró'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setIsLoading(true);
+    try {
+      await resetPassword(email.trim());
+      showSuccess('Código reenviado', 'Te enviamos un nuevo código a tu correo');
+    } catch (error) {
+      showError(
+        'Error',
+        error instanceof Error ? error.message : 'No se pudo reenviar el código'
       );
     } finally {
       setIsLoading(false);
@@ -58,52 +97,109 @@ export default function ForgotPasswordScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.logo}>Cuotify</Text>
             <Text style={styles.subtitle}>Recuperar contraseña</Text>
           </View>
 
-          <View style={styles.formContainer}>
-            <Text style={styles.title}>¿Olvidaste tu contraseña?</Text>
-            <Text style={styles.description}>
-              Ingresa tu correo electrónico y te enviaremos un enlace para
-              restablecer tu contraseña.
-            </Text>
+          {step === 1 ? (
+            <View style={styles.formContainer}>
+              <Text style={styles.title}>¿Olvidaste tu contraseña?</Text>
+              <Text style={styles.description}>
+                Ingresa tu correo electrónico y te enviaremos un código para
+                restablecer tu contraseña.
+              </Text>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Correo electrónico</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="tu@email.com"
-                placeholderTextColor={colors.text.disabled}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Correo electrónico</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="tu@email.com"
+                  placeholderTextColor={colors.text.disabled}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
 
-            <TouchableOpacity
-              style={[styles.button, isLoading && styles.buttonDisabled]}
-              onPress={handleResetPassword}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color={colors.text.inverse} />
-              ) : (
-                <Text style={styles.buttonText}>Enviar enlace</Text>
-              )}
-            </TouchableOpacity>
-
-            <Link href="/(auth)/login" asChild>
-              <TouchableOpacity style={styles.backButton}>
-                <Text style={styles.backButtonText}>Volver al inicio</Text>
+              <TouchableOpacity
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleSendCode}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={colors.text.inverse} />
+                ) : (
+                  <Text style={styles.buttonText}>Enviar código</Text>
+                )}
               </TouchableOpacity>
-            </Link>
-          </View>
+
+              <Link href="/(auth)/login" asChild>
+                <TouchableOpacity style={styles.backButton}>
+                  <Text style={styles.backButtonText}>Volver al inicio</Text>
+                </TouchableOpacity>
+              </Link>
+            </View>
+          ) : (
+            <View style={styles.formContainer}>
+              <Text style={styles.title}>Ingresa el código</Text>
+              <Text style={styles.description}>
+                Enviamos un código de 8 dígitos a{'\n'}
+                <Text style={styles.emailHighlight}>{email.trim()}</Text>
+              </Text>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Código de verificación</Text>
+                <TextInput
+                  style={[styles.input, styles.codeInput]}
+                  placeholder="00000000"
+                  placeholderTextColor={colors.text.disabled}
+                  value={code}
+                  onChangeText={(text) => setCode(text.replace(/[^0-9]/g, '').slice(0, 8))}
+                  keyboardType="number-pad"
+                  maxLength={8}
+                  autoFocus
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleVerifyCode}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={colors.text.inverse} />
+                ) : (
+                  <Text style={styles.buttonText}>Verificar código</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={handleResendCode}
+                disabled={isLoading}
+              >
+                <Text style={styles.backButtonText}>Reenviar código</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => {
+                  setCode('');
+                  setStep(1);
+                }}
+                disabled={isLoading}
+              >
+                <Text style={styles.secondaryLink}>Cambiar correo</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
@@ -159,6 +255,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     lineHeight: 20,
   },
+  emailHighlight: {
+    fontWeight: fontWeight.semiBold,
+    color: colors.text.primary,
+  },
   inputContainer: {
     marginBottom: spacing.lg,
   },
@@ -176,6 +276,12 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  codeInput: {
+    textAlign: 'center',
+    fontSize: fontSize.xl,
+    letterSpacing: 4,
+    fontWeight: fontWeight.bold,
   },
   button: {
     backgroundColor: colors.primary.main,
@@ -199,6 +305,11 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: fontSize.sm,
     color: colors.primary.main,
+    fontWeight: fontWeight.medium,
+  },
+  secondaryLink: {
+    fontSize: fontSize.sm,
+    color: colors.text.secondary,
     fontWeight: fontWeight.medium,
   },
 });

@@ -7,6 +7,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -29,17 +31,14 @@ export default function ResetPasswordScreen() {
 
   const validateSession = async () => {
     try {
-      // Verificar si hay una sesión válida del enlace de recuperación
-      const { data: { session }, error } = await supabase.auth.getSession();
-
-      if (error) {
-        throw error;
-      }
+      // La sesión ya fue creada: al verificar el código de recuperación
+      // (verifyOtp) o porque el usuario está logueado y viene desde Ajustes.
+      const { data: { session } } = await supabase.auth.getSession();
 
       if (session) {
         setIsValidSession(true);
       } else {
-        showError('Enlace inválido', 'El enlace ha expirado o es inválido. Solicita uno nuevo.');
+        showError('Sesión inválida', 'No se pudo validar tu sesión. Solicita un nuevo código.');
         setTimeout(() => {
           router.replace('/(auth)/forgot-password');
         }, 2000);
@@ -97,7 +96,7 @@ export default function ResetPasswordScreen() {
       <LinearGradient colors={gradients.primary} style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.text.inverse} />
-          <Text style={styles.loadingText}>Validando enlace...</Text>
+          <Text style={styles.loadingText}>Validando...</Text>
         </View>
       </LinearGradient>
     );
@@ -119,6 +118,7 @@ export default function ResetPasswordScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.logo}>Cuotify</Text>
@@ -164,6 +164,7 @@ export default function ResetPasswordScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
