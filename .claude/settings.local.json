@@ -5,7 +5,6 @@
       "Bash(npm uninstall *)",
       "Bash(git check-ignore *)",
       "Bash(npx tsc *)",
-      "Bash(echo \"exit: $?\")",
       "Bash(npx expo-doctor *)",
       "Bash(npx eas-cli *)",
       "Bash(git diff *)",
