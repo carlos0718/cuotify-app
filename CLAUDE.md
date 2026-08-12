@@ -141,3 +141,91 @@ Three specialized subagents are configured for this project. Invoke them with `@
 | `sonnet` | Claude Sonnet | Most tasks — good balance of speed and capability |
 | `opus` | Claude Opus | Complex reasoning, deep analysis — slowest and most expensive |
 | `inherit` | Same as parent | Subagent uses whatever model Claude Code is running with |
+
+---
+
+# Project Workflow (charlydev-flow, adopted 2026-08-10)
+
+## Source-of-truth documents
+
+| File | Answers | Update when |
+|---|---|---|
+| `SPEC.md` | **What** the product is: domain model, features, acceptance criteria, risks | Before writing code for any new feature |
+| `CLAUDE.md` (this file) | **How** to work in this codebase | When a convention changes |
+| `TODO.md` | **What's next**, in priority order | Every completed task |
+| `docs/IMPROVEMENTS.md` | **What's wrong** — full audit with IDs (S1, L3, A2, U4…) | When a finding is fixed or a new one is found |
+| `design-system/MASTER.md` | Design tokens, component inventory, usage rules | When tokens or shared components change |
+
+Finding IDs (`S*` security, `L*` logic, `A*` architecture, `U*` UX, `P*` product) are
+stable — reference them in commit messages: `fix(loans): formatCurrency default a ARS (L1)`.
+
+## Architecture — Layer-based, with an unfinished extraction
+
+The project is organized **by technical layer**, not by feature:
+
+```
+src/
+  app/          Expo Router file-based routes — the screens
+  components/   Shared UI  (ui/ is populated; the feature folders are EMPTY)
+  hooks/        Custom hooks  (EMPTY)
+  services/     supabase/ · calculations/ · notifications/ · pdf/ · gemini/ · subscription/
+  store/        Zustand stores
+  theme/        Design tokens
+  types/        Shared types + generated database.types.ts
+  utils/        Pure helpers
+supabase/
+  migrations/   Versioned SQL   ⚠ currently out of sync with the real DB — see S3
+  functions/    Edge Functions (Deno)
+```
+
+**Why layer-based fits here:** the app has ~14 screens over two parallel domains
+(loans / debts) that share almost all their infrastructure — one Supabase client, one
+calculation engine, one theme. Feature-based would duplicate that plumbing for little gain.
+
+**The trade-off it's currently paying:** because `components/{loans,common,…}/` and
+`hooks/` were created but never filled, all UI lives inline in the screens — four files
+exceed 1000 lines and `loans/create.tsx` / `debts/create.tsx` are the same form written
+twice. The architecture isn't wrong; it's incomplete.
+
+**Rule for new code:** a screen file stays under ~400 lines. Anything beyond that —
+sub-components, data fetching, business logic — is extracted to
+`components/<feature>/` or `hooks/`. Don't refactor everything at once; extract what
+you touch. See `docs/IMPROVEMENTS.md` § A1 for the target layout.
+
+## Iteration flow — Spec-First
+
+For any new feature or non-trivial change:
+
+1. **Spec** — update `SPEC.md` first: what it does, which invariants it touches, its
+   acceptance criteria. If it changes the domain model, update § 4 too.
+2. **Schema** — if the DB changes, write a **numbered migration** in
+   `supabase/migrations/`. Never change the schema from the Supabase dashboard: that's
+   how the current drift (S3) happened.
+3. **Types** — regenerate `database.types.ts` after any schema change.
+4. **Implementation** — services first, then hooks, then screen.
+5. **Verification** — `npx tsc --noEmit`, plus a unit test if it touches
+   `loanCalculator.ts` (money math is not verified by hand).
+6. **TODO** — check off the task and note anything new that came up.
+
+## Commit convention
+
+One completed task = one commit + push. Conventional commits, subject in Spanish,
+referencing the finding ID when applicable:
+
+```
+fix(rls): restringir UPDATE de prestatarios a columnas de comentario (S1)
+feat(loans): registrar pago parcial de cuota (P1)
+refactor(loans): extraer LoanCard y PaymentRow a components/loans (A1)
+docs(spec): actualizar criterios de aceptación de préstamo abierto
+```
+
+Never commit `.env`, API keys, or generated builds.
+
+## Caveat on the `as never` pattern
+
+The "Type casting" convention above is accurate as a description of the existing code,
+but it is **not safe**: `end_date: null as never` in `loans/create.tsx` silenced a real
+`NOT NULL` violation (finding S4). Prefer regenerating the Supabase types over adding
+new casts, and when a cast is unavoidable, verify the value against the actual column
+constraint first.
+

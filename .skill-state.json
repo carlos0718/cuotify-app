@@ -1,0 +1,16 @@
+{
+  "mode": "adopted",
+  "timestamp": "2026-08-10T00:00:00.000Z",
+  "step": "adoption_complete",
+  "project": "cuotify",
+  "stage": "pre-launch",
+  "architecture": "layer-based",
+  "decisions": {
+    "stack_detected": true,
+    "spec_generated": true,
+    "claude_md_generated": "merged",
+    "todo_generated": true,
+    "design_system_generated": true,
+    "improvements_audit_generated": true
+  }
+}
