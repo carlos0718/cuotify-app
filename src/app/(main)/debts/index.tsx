@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { getPersonalDebts, getDebtStats, getNextPendingPaymentDates, getLinkedLoans, getNextPendingPaymentDatesByLoan, getLinkedLoanPaymentStats } from '../../../services/supabase';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
-import { PersonalDebt } from '../../../services/supabase/personalDebts';
+import { PersonalDebt, DebtStats, emptyDebtStats } from '../../../services/supabase/personalDebts';
+import { CurrencyType } from '../../../types';
 
 function DebtListCard({
   id,
@@ -71,7 +72,7 @@ function DebtListCard({
 export default function DebtsScreen() {
   const [debts, setDebts] = useState<PersonalDebt[]>([]);
   const [linkedLoans, setLinkedLoans] = useState<any[]>([]);
-  const [stats, setStats] = useState({ totalDebts: 0, activeDebts: 0, totalToPay: 0, totalPaid: 0, remainingToPay: 0 });
+  const [stats, setStats] = useState<DebtStats>(emptyDebtStats());
   const [nextPaymentDates, setNextPaymentDates] = useState<Record<string, string>>({});
   const [nextLoanPaymentDates, setNextLoanPaymentDates] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -93,12 +94,28 @@ export default function DebtsScreen() {
       const allLoanIds = linkedLoansData.map((l: any) => l.id);
 
       const linkedStats = await getLinkedLoanPaymentStats(allLoanIds);
+
+      // Fusionar deudas propias + préstamos vinculados, respetando la moneda (L2)
+      const byCurrency = emptyDebtStats().byCurrency;
+      for (const currency of ['ARS', 'USD'] as CurrencyType[]) {
+        byCurrency[currency] = {
+          totalOwed: statsData.byCurrency[currency].totalOwed,
+          totalToPay: statsData.byCurrency[currency].totalToPay + linkedStats[currency].totalToPay,
+          totalPaid: statsData.byCurrency[currency].totalPaid + linkedStats[currency].totalPaid,
+          remainingToPay:
+            statsData.byCurrency[currency].remainingToPay + linkedStats[currency].remainingToPay,
+        };
+      }
+      const currencies = (['ARS', 'USD'] as CurrencyType[]).filter(
+        c => byCurrency[c].totalToPay > 0 || byCurrency[c].totalPaid > 0
+      );
+
       setStats({
         totalDebts: statsData.totalDebts,
         activeDebts: statsData.activeDebts,
-        totalToPay: statsData.totalToPay + linkedStats.totalToPay,
-        totalPaid: statsData.totalPaid + linkedStats.totalPaid,
-        remainingToPay: statsData.remainingToPay + linkedStats.remainingToPay,
+        completedDebts: statsData.completedDebts,
+        currencies,
+        byCurrency,
       });
 
       const [nextDates, nextLoanDates] = await Promise.all([
@@ -133,10 +150,10 @@ export default function DebtsScreen() {
     return true;
   });
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, currency: CurrencyType = 'ARS') => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
-      currency: 'ARS',
+      currency,
       minimumFractionDigits: 0,
     }).format(amount);
   };
@@ -205,43 +222,50 @@ export default function DebtsScreen() {
 
       {/* Resumen */}
       <View style={styles.summarySection}>
-        {/* Total comprometido - Full width */}
-        <View style={[styles.summaryCard, styles.summaryCardPrimary]}>
-          <View style={[styles.summaryIcon, styles.summaryIconLight]}>
-            <Text style={styles.summaryIconText}>$</Text>
-          </View>
-          <View style={styles.summaryContent}>
-            <Text style={styles.summaryLabelLight}>Total comprometido</Text>
-            <Text style={styles.summaryValueLarge} numberOfLines={1} adjustsFontSizeToFit>
-              {formatCurrency(stats.totalToPay)}
-            </Text>
-          </View>
-        </View>
-        {/* Ya pagué y Me resta - Side by side */}
-        <View style={styles.summaryRow}>
-          <View style={[styles.summaryCard, styles.summaryCardSmall, styles.summaryCardSuccess]}>
-            <View style={[styles.summaryIconSmall, styles.summaryIconSuccess]}>
-              <Text style={styles.summaryIconTextSmall}>✓</Text>
+        {/* Un bloque por moneda (L2: ARS y USD no se suman) */}
+        {(stats.currencies.length ? stats.currencies : (['ARS'] as const)).map((currency) => (
+          <View key={currency}>
+            {/* Total comprometido - Full width */}
+            <View style={[styles.summaryCard, styles.summaryCardPrimary]}>
+              <View style={[styles.summaryIcon, styles.summaryIconLight]}>
+                <Text style={styles.summaryIconText}>{currency === 'ARS' ? '$' : 'US$'}</Text>
+              </View>
+              <View style={styles.summaryContent}>
+                <Text style={styles.summaryLabelLight}>
+                  {stats.currencies.length > 1 ? `Total comprometido en ${currency}` : 'Total comprometido'}
+                </Text>
+                <Text style={styles.summaryValueLarge} numberOfLines={1} adjustsFontSizeToFit>
+                  {formatCurrency(stats.byCurrency[currency].totalToPay, currency)}
+                </Text>
+              </View>
             </View>
-            <View style={styles.summaryContent}>
-              <Text style={styles.summaryLabelDark}>Ya pagué</Text>
-              <Text style={[styles.summaryValueSmall, { color: colors.success }]} numberOfLines={1} adjustsFontSizeToFit>
-                {formatCurrency(stats.totalPaid)}
-              </Text>
+            {/* Ya pagué y Me resta - Side by side */}
+            <View style={styles.summaryRow}>
+              <View style={[styles.summaryCard, styles.summaryCardSmall, styles.summaryCardSuccess]}>
+                <View style={[styles.summaryIconSmall, styles.summaryIconSuccess]}>
+                  <Text style={styles.summaryIconTextSmall}>✓</Text>
+                </View>
+                <View style={styles.summaryContent}>
+                  <Text style={styles.summaryLabelDark}>Ya pagué</Text>
+                  <Text style={[styles.summaryValueSmall, { color: colors.success }]} numberOfLines={1} adjustsFontSizeToFit>
+                    {formatCurrency(stats.byCurrency[currency].totalPaid, currency)}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.summaryCard, styles.summaryCardSmall, styles.summaryCardWarning]}>
+                <View style={[styles.summaryIconSmall, styles.summaryIconWarning]}>
+                  <Text style={styles.summaryIconTextSmall}>⏳</Text>
+                </View>
+                <View style={styles.summaryContent}>
+                  <Text style={styles.summaryLabelDark}>Me resta</Text>
+                  <Text style={[styles.summaryValueSmall, { color: colors.warning }]} numberOfLines={1} adjustsFontSizeToFit>
+                    {formatCurrency(stats.byCurrency[currency].remainingToPay, currency)}
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
-          <View style={[styles.summaryCard, styles.summaryCardSmall, styles.summaryCardWarning]}>
-            <View style={[styles.summaryIconSmall, styles.summaryIconWarning]}>
-              <Text style={styles.summaryIconTextSmall}>⏳</Text>
-            </View>
-            <View style={styles.summaryContent}>
-              <Text style={styles.summaryLabelDark}>Me resta</Text>
-              <Text style={[styles.summaryValueSmall, { color: colors.warning }]} numberOfLines={1} adjustsFontSizeToFit>
-                {formatCurrency(stats.remainingToPay)}
-              </Text>
-            </View>
-          </View>
-        </View>
+        ))}
       </View>
 
       {/* Lista de deudas */}
@@ -267,7 +291,7 @@ export default function DebtsScreen() {
               key={debt.id}
               id={debt.id}
               creditorName={debt.creditor_name}
-              amount={formatCurrency(debt.total_amount)}
+              amount={formatCurrency(debt.total_amount, debt.currency ?? 'ARS')}
               dueInfo={getDueInfo(debt)}
               status={debt.status}
               color={debt.color_code || colors.primary.main}
@@ -298,7 +322,9 @@ export default function DebtsScreen() {
                         <Text style={styles.readOnlyBadgeText}>Solo lectura</Text>
                       </View>
                     </View>
-                    <Text style={styles.linkedLoanAmount}>{formatCurrency(loan.total_amount)}</Text>
+                    <Text style={styles.linkedLoanAmount}>
+                      {formatCurrency(loan.total_amount, loan.currency ?? 'ARS')}
+                    </Text>
                   </View>
                 </TouchableOpacity>
               ))}

@@ -8,8 +8,10 @@ import { useAuthStore } from '../../../store';
 import { getLoans, getLoanStats, getUpcomingPayments, getOverduePayments, getDebtStats, getNextPendingPaymentDatesByLoan } from '../../../services/supabase';
 import { getReadIds } from '../../../services/notifications';
 import { colors, gradients, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
-import { Borrower } from '../../../types';
+import { Borrower, CurrencyType } from '../../../types';
 import { DebtStats } from '../../../services/supabase/personalDebts';
+import { LoanStats, emptyLoanStats } from '../../../services/supabase/loans';
+import { usePreferencesStore } from '../../../store';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -219,8 +221,9 @@ function StatCard({
 
 export default function DashboardScreen() {
   const { profile, isLender, isBorrower } = useAuthStore();
+  const defaultCurrency = usePreferencesStore((s) => s.defaultCurrency);
   const [loans, setLoans] = useState<LoanWithBorrower[]>([]);
-  const [stats, setStats] = useState({ totalLoans: 0, totalLent: 0, totalExpected: 0, totalRecovered: 0, totalPending: 0, activeLoans: 0, completedLoans: 0 });
+  const [stats, setStats] = useState<LoanStats>(emptyLoanStats());
   const [upcomingPayments, setUpcomingPayments] = useState<PaymentWithLoan[]>([]);
   const [overdueCount, setOverdueCount] = useState(0);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
@@ -289,10 +292,10 @@ export default function DashboardScreen() {
     router.push(`/(main)/loans/${id}`);
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, currency: CurrencyType = 'ARS') => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
-      currency: 'ARS',
+      currency,
       minimumFractionDigits: 0,
     }).format(amount);
   };
@@ -309,13 +312,31 @@ export default function DashboardScreen() {
     return `Vence en ${diffDays} días`;
   };
 
-  // % cobrado: pagos realmente cobrados vs total esperado
-  const lenderPercentage = stats.totalExpected > 0
-    ? Math.min(100, Math.round((stats.totalRecovered / stats.totalExpected) * 100))
+  // El hero muestra una sola moneda —dos anillos de progreso apilados no se leen—:
+  // la preferida del usuario si tiene movimiento, si no la primera con datos.
+  // Las tarjetas de abajo sí se apilan por moneda (L2).
+  const primaryCurrency: CurrencyType = stats.currencies.includes(defaultCurrency)
+    ? defaultCurrency
+    : (stats.currencies[0] ?? defaultCurrency);
+
+  const lenderMoney = stats.byCurrency[primaryCurrency];
+  const debtMoney = debtStats?.byCurrency[primaryCurrency];
+
+  /** Monedas a mostrar en las tarjetas; nunca vacío, para no dejar la sección en blanco. */
+  const lenderCurrencies: readonly CurrencyType[] = stats.currencies.length
+    ? stats.currencies
+    : [primaryCurrency];
+  const debtCurrencies: readonly CurrencyType[] = debtStats?.currencies.length
+    ? debtStats.currencies
+    : [primaryCurrency];
+
+  // % cobrado: pagos realmente cobrados vs total esperado, en la moneda principal
+  const lenderPercentage = lenderMoney.totalExpected > 0
+    ? Math.min(100, Math.round((lenderMoney.totalRecovered / lenderMoney.totalExpected) * 100))
     : 0;
 
-  const debtPercentage = debtStats && debtStats.totalToPay > 0
-    ? Math.min(100, Math.round((debtStats.totalPaid / debtStats.totalToPay) * 100))
+  const debtPercentage = debtMoney && debtMoney.totalToPay > 0
+    ? Math.min(100, Math.round((debtMoney.totalPaid / debtMoney.totalToPay) * 100))
     : 0;
 
   const hasDebtData = debtStats !== null && debtStats.activeDebts > 0;
@@ -394,11 +415,11 @@ export default function DashboardScreen() {
 
           <HeroMetricsCard
             lenderPct={lenderPercentage}
-            lenderAmount={stats.totalExpected > 0 ? formatShortCurrency(stats.totalExpected) : '$0'}
-            lenderRecovered={formatShortCurrency(stats.totalRecovered)}
+            lenderAmount={lenderMoney.totalExpected > 0 ? formatShortCurrency(lenderMoney.totalExpected) : '$0'}
+            lenderRecovered={formatShortCurrency(lenderMoney.totalRecovered)}
             debtPct={debtPercentage}
-            debtTotal={debtStats ? formatShortCurrency(debtStats.totalToPay) : '$0'}
-            debtPaid={debtStats ? formatShortCurrency(debtStats.totalPaid) : '$0'}
+            debtTotal={debtMoney ? formatShortCurrency(debtMoney.totalToPay) : '$0'}
+            debtPaid={debtMoney ? formatShortCurrency(debtMoney.totalPaid) : '$0'}
             showDebts={hasDebtData}
           />
         </SafeAreaView>
@@ -457,14 +478,17 @@ export default function DashboardScreen() {
         {/* Estadísticas de préstamos - Solo si es prestamista */}
         {isLender() && (
           <View style={styles.statsSection}>
-            {/* Por cobrar - Full width */}
-            <StatCard
-              title="Por cobrar"
-              value={formatCurrency(stats.totalPending)}
-              icon="$"
-              variant="primary"
-              fullWidth
-            />
+            {/* Por cobrar - una tarjeta por moneda (L2) */}
+            {lenderCurrencies.map((currency) => (
+              <StatCard
+                key={currency}
+                title={lenderCurrencies.length > 1 ? `Por cobrar en ${currency}` : 'Por cobrar'}
+                value={formatCurrency(stats.byCurrency[currency].totalPending, currency)}
+                icon="$"
+                variant="primary"
+                fullWidth
+              />
+            ))}
             {/* Préstamos activos y Completados - Side by side */}
             <View style={styles.statsRow}>
               <StatCard
@@ -480,19 +504,22 @@ export default function DashboardScreen() {
                 variant="success"
               />
             </View>
-            {/* Balance neto - Solo si el usuario también es prestatario */}
-            {isBorrower() && debtStats && (() => {
-              const netBalance = stats.totalPending - debtStats.remainingToPay;
+            {/* Balance neto - Solo si el usuario también es prestatario.
+                Se calcula por moneda: restar pesos contra dólares no significa nada (L2). */}
+            {isBorrower() && debtStats && lenderCurrencies.map((currency) => {
+              const netBalance =
+                stats.byCurrency[currency].totalPending - debtStats.byCurrency[currency].remainingToPay;
               return (
                 <StatCard
-                  title="Balance neto"
-                  value={formatCurrency(netBalance)}
+                  key={currency}
+                  title={lenderCurrencies.length > 1 ? `Balance neto en ${currency}` : 'Balance neto'}
+                  value={formatCurrency(netBalance, currency)}
                   icon={netBalance >= 0 ? '↑' : '↓'}
                   variant={netBalance >= 0 ? 'success' : 'warning'}
                   fullWidth
                 />
               );
-            })()}
+            })}
           </View>
         )}
 
@@ -507,33 +534,37 @@ export default function DashboardScreen() {
             </View>
 
             {debtStats.activeDebts > 0 ? (
-              <View style={styles.debtsSummaryCard}>
-                <View style={styles.debtsSummaryRow}>
-                  <View style={styles.debtsSummaryItem}>
-                    <Text style={styles.debtsSummaryLabel}>Deudas activas</Text>
-                    <Text style={styles.debtsSummaryValue}>{debtStats.activeDebts}</Text>
+              debtCurrencies.map((currency) => {
+                const money = debtStats.byCurrency[currency];
+                const paidPct = money.totalToPay > 0 ? (money.totalPaid / money.totalToPay) * 100 : 0;
+                return (
+                  <View key={currency} style={styles.debtsSummaryCard}>
+                    <View style={styles.debtsSummaryRow}>
+                      <View style={styles.debtsSummaryItem}>
+                        <Text style={styles.debtsSummaryLabel}>
+                          {debtCurrencies.length > 1 ? `Deudas activas (${currency})` : 'Deudas activas'}
+                        </Text>
+                        <Text style={styles.debtsSummaryValue}>{debtStats.activeDebts}</Text>
+                      </View>
+                      <View style={styles.debtsSummaryItem}>
+                        <Text style={styles.debtsSummaryLabel}>Total a pagar</Text>
+                        <Text style={[styles.debtsSummaryValue, { color: colors.error }]}>
+                          {formatCurrency(money.remainingToPay, currency)}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.debtsProgressContainer}>
+                      <View style={styles.debtsProgressBg}>
+                        <View style={[styles.debtsProgressFill, { width: `${paidPct}%` }]} />
+                      </View>
+                      <Text style={styles.debtsProgressText}>
+                        {formatCurrency(money.totalPaid, currency)} pagado de{' '}
+                        {formatCurrency(money.totalToPay, currency)}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.debtsSummaryItem}>
-                    <Text style={styles.debtsSummaryLabel}>Total a pagar</Text>
-                    <Text style={[styles.debtsSummaryValue, { color: colors.error }]}>
-                      {formatCurrency(debtStats.remainingToPay)}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.debtsProgressContainer}>
-                  <View style={styles.debtsProgressBg}>
-                    <View
-                      style={[
-                        styles.debtsProgressFill,
-                        { width: `${debtStats.totalToPay > 0 ? (debtStats.totalPaid / debtStats.totalToPay) * 100 : 0}%` }
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.debtsProgressText}>
-                    {formatCurrency(debtStats.totalPaid)} pagado de {formatCurrency(debtStats.totalToPay)}
-                  </Text>
-                </View>
-              </View>
+                );
+              })
             ) : (
               <TouchableOpacity
                 style={styles.debtsEmptyCard}

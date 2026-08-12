@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuthStore } from '../../../store';
 import { getLoans, getLoanStats, getNextPendingPaymentDatesByLoan } from '../../../services/supabase';
+import { LoanStats, emptyLoanStats } from '../../../services/supabase/loans';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { Borrower } from '../../../types';
 
@@ -84,7 +85,7 @@ interface LoanWithBorrower {
 export default function LoansScreen() {
   const { isLender } = useAuthStore();
   const [loans, setLoans] = useState<LoanWithBorrower[]>([]);
-  const [stats, setStats] = useState({ totalLoans: 0, totalLent: 0, activeLoans: 0, completedLoans: 0 });
+  const [stats, setStats] = useState<LoanStats>(emptyLoanStats());
   const [nextPaymentDates, setNextPaymentDates] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -233,18 +234,22 @@ export default function LoansScreen() {
 
       {/* Resumen */}
       <View style={styles.summarySection}>
-        {/* Total prestado - Full width */}
-        <View style={[styles.summaryCard, styles.summaryCardPrimary]}>
-          <View style={[styles.summaryIcon, styles.summaryIconLight]}>
-            <Text style={styles.summaryIconText}>$</Text>
+        {/* Total prestado - una tarjeta por moneda (L2: ARS y USD no se suman) */}
+        {(stats.currencies.length ? stats.currencies : (['ARS'] as const)).map((currency) => (
+          <View key={currency} style={[styles.summaryCard, styles.summaryCardPrimary]}>
+            <View style={[styles.summaryIcon, styles.summaryIconLight]}>
+              <Text style={styles.summaryIconText}>{currency === 'ARS' ? '$' : 'US$'}</Text>
+            </View>
+            <View style={styles.summaryContent}>
+              <Text style={styles.summaryLabelLight}>
+                {stats.currencies.length > 1 ? `Total prestado en ${currency}` : 'Total prestado'}
+              </Text>
+              <Text style={styles.summaryValueLarge} numberOfLines={1} adjustsFontSizeToFit>
+                {formatCurrency(stats.byCurrency[currency].totalLent, currency)}
+              </Text>
+            </View>
           </View>
-          <View style={styles.summaryContent}>
-            <Text style={styles.summaryLabelLight}>Total prestado</Text>
-            <Text style={styles.summaryValueLarge} numberOfLines={1} adjustsFontSizeToFit>
-              {formatCurrency(stats.totalLent)}
-            </Text>
-          </View>
-        </View>
+        ))}
         {/* Activos y Completados - Side by side */}
         <View style={styles.summaryRow}>
           <View style={[styles.summaryCard, styles.summaryCardSmall, styles.summaryCardInfo]}>

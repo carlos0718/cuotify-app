@@ -1,5 +1,6 @@
 import { supabase } from './client';
 import { handleSupabaseError } from './client';
+import { CurrencyType } from '../../types';
 
 // =============================================
 // TIPOS
@@ -358,14 +359,23 @@ export async function getDebtPaidAmounts(): Promise<Record<string, number>> {
 // ESTADÍSTICAS
 // =============================================
 
-export interface DebtStats {
-  totalDebts: number;
-  activeDebts: number;
-  completedDebts: number;
+/** Montos de una sola moneda. Nunca mezclar dos de estos entre sí. */
+export interface DebtMoneyStats {
   totalOwed: number; // Total que debe (principal)
   totalToPay: number; // Total a pagar (con interés)
   totalPaid: number; // Total ya pagado
   remainingToPay: number; // Falta por pagar
+}
+
+export interface DebtStats {
+  // Conteos: no dependen de la moneda
+  totalDebts: number;
+  activeDebts: number;
+  completedDebts: number;
+  /** Monedas realmente en uso, para decidir qué mostrar */
+  currencies: CurrencyType[];
+  /** Montos separados por moneda. Sumarlos entre sí no tiene sentido (L2). */
+  byCurrency: Record<CurrencyType, DebtMoneyStats>;
 }
 
 /**
@@ -396,46 +406,92 @@ export async function getNextPendingPaymentDates(debtIds: string[]): Promise<Rec
   return result;
 }
 
+const emptyDebtMoneyStats = (): DebtMoneyStats => ({
+  totalOwed: 0,
+  totalToPay: 0,
+  totalPaid: 0,
+  remainingToPay: 0,
+});
+
+/** Valor inicial para el estado de las pantallas, antes de que cargue la query. */
+export const emptyDebtStats = (): DebtStats => ({
+  totalDebts: 0,
+  activeDebts: 0,
+  completedDebts: 0,
+  currencies: [],
+  byCurrency: { ARS: emptyDebtMoneyStats(), USD: emptyDebtMoneyStats() },
+});
+
+/**
+ * Estadísticas de deudas personales, **separadas por moneda** (L2).
+ *
+ * `totalPaid` se acumula solo sobre las deudas activas, igual que `totalToPay`,
+ * para que `remainingToPay` sea coherente: antes se restaba el pagado de *todas*
+ * las deudas (incluidas las completadas) contra el total a pagar de las activas.
+ */
 export async function getDebtStats(): Promise<DebtStats> {
   const { data: debts, error } = await supabase
     .from('personal_debts')
-    .select('status, principal_amount, total_amount');
+    .select('id, status, principal_amount, total_amount, currency');
 
   if (error) throw new Error(handleSupabaseError(error));
 
   const debtsList = (debts || []) as {
+    id: string;
     status: string;
     principal_amount: number;
     total_amount: number;
+    currency: CurrencyType | null;
   }[];
 
-  // Obtener total pagado
-  const { data: payments, error: paymentsError } = await supabase
-    .from('debt_payments')
-    .select('paid_amount, status')
-    .eq('status', 'paid');
+  // Las cuotas no tienen moneda propia: la heredan de la deuda
+  const currencyOf = new Map<string, CurrencyType>(
+    debtsList.map(d => [d.id, d.currency ?? 'ARS'])
+  );
+  const activeIds = debtsList.filter(d => d.status === 'active').map(d => d.id);
+
+  const { data: payments, error: paymentsError } = activeIds.length
+    ? await supabase
+        .from('debt_payments')
+        .select('debt_id, paid_amount')
+        .eq('status', 'paid')
+        .in('debt_id', activeIds)
+    : { data: [], error: null };
 
   if (paymentsError) throw new Error(handleSupabaseError(paymentsError));
 
-  const totalPaid = (payments || []).reduce(
-    (sum: number, p: { paid_amount: number }) => sum + (p.paid_amount || 0),
-    0
-  );
+  const byCurrency: Record<CurrencyType, DebtMoneyStats> = {
+    ARS: emptyDebtMoneyStats(),
+    USD: emptyDebtMoneyStats(),
+  };
 
-  const totalToPay = debtsList
-    .filter(d => d.status === 'active')
-    .reduce((sum, d) => sum + d.total_amount, 0);
+  for (const debt of debtsList) {
+    if (debt.status !== 'active') continue;
+    const bucket = byCurrency[debt.currency ?? 'ARS'];
+    bucket.totalOwed += Number(debt.principal_amount);
+    bucket.totalToPay += Number(debt.total_amount);
+  }
+
+  for (const p of (payments || []) as { debt_id: string; paid_amount: number }[]) {
+    const currency = currencyOf.get(p.debt_id);
+    if (currency) byCurrency[currency].totalPaid += Number(p.paid_amount || 0);
+  }
+
+  for (const currency of ['ARS', 'USD'] as CurrencyType[]) {
+    const b = byCurrency[currency];
+    b.remainingToPay = b.totalToPay - b.totalPaid;
+  }
+
+  const currencies = (['ARS', 'USD'] as CurrencyType[]).filter(c =>
+    debtsList.some(d => d.status === 'active' && (d.currency ?? 'ARS') === c)
+  );
 
   return {
     totalDebts: debtsList.length,
     activeDebts: debtsList.filter(d => d.status === 'active').length,
     completedDebts: debtsList.filter(d => d.status === 'completed').length,
-    totalOwed: debtsList
-      .filter(d => d.status === 'active')
-      .reduce((sum, d) => sum + d.principal_amount, 0),
-    totalToPay,
-    totalPaid,
-    remainingToPay: totalToPay - totalPaid,
+    currencies,
+    byCurrency,
   };
 }
 

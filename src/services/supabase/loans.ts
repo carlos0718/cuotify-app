@@ -1,5 +1,5 @@
 import { supabase, handleSupabaseError } from './client';
-import { Borrower, Loan, BorrowerInsert, LoanInsert, Payment } from '../../types';
+import { Borrower, Loan, BorrowerInsert, LoanInsert, Payment, CurrencyType } from '../../types';
 import { calculateLatePenalty } from '../calculations';
 
 // =============================================
@@ -177,27 +177,58 @@ export async function getLinkedLoans() {
   return data || [];
 }
 
-export async function getLinkedLoanPaymentStats(loanIds: string[]): Promise<{
+export interface LinkedLoanMoneyStats {
   totalToPay: number;
   totalPaid: number;
   remainingToPay: number;
-}> {
-  if (!loanIds.length) return { totalToPay: 0, totalPaid: 0, remainingToPay: 0 };
+}
 
-  const { data, error } = await supabase
-    .from('payments')
-    .select('total_amount, paid_amount, status')
-    .in('loan_id', loanIds);
+export const emptyLinkedLoanStats = (): Record<CurrencyType, LinkedLoanMoneyStats> => ({
+  ARS: { totalToPay: 0, totalPaid: 0, remainingToPay: 0 },
+  USD: { totalToPay: 0, totalPaid: 0, remainingToPay: 0 },
+});
 
-  if (error) throw new Error(handleSupabaseError(error));
+/**
+ * Totales de los préstamos donde el usuario es el prestatario vinculado,
+ * **separados por moneda** (L2). Las cuotas heredan la moneda del préstamo.
+ */
+export async function getLinkedLoanPaymentStats(
+  loanIds: string[]
+): Promise<Record<CurrencyType, LinkedLoanMoneyStats>> {
+  const result = emptyLinkedLoanStats();
+  if (!loanIds.length) return result;
 
-  const payments = (data || []) as { total_amount: number; paid_amount: number; status: string }[];
-  const totalToPay = payments.reduce((sum, p) => sum + (p.total_amount || 0), 0);
-  const totalPaid = payments
-    .filter(p => p.status === 'paid')
-    .reduce((sum, p) => sum + (p.paid_amount || p.total_amount || 0), 0);
+  const [loansRes, paymentsRes] = await Promise.all([
+    supabase.from('loans').select('id, currency').in('id', loanIds),
+    supabase.from('payments').select('loan_id, total_amount, paid_amount, status').in('loan_id', loanIds),
+  ]);
 
-  return { totalToPay, totalPaid, remainingToPay: totalToPay - totalPaid };
+  if (loansRes.error) throw new Error(handleSupabaseError(loansRes.error));
+  if (paymentsRes.error) throw new Error(handleSupabaseError(paymentsRes.error));
+
+  const currencyOf = new Map<string, CurrencyType>(
+    ((loansRes.data || []) as { id: string; currency: CurrencyType | null }[])
+      .map(l => [l.id, l.currency ?? 'ARS'])
+  );
+
+  const payments = (paymentsRes.data || []) as {
+    loan_id: string; total_amount: number; paid_amount: number; status: string;
+  }[];
+
+  for (const p of payments) {
+    const currency = currencyOf.get(p.loan_id);
+    if (!currency) continue;
+    result[currency].totalToPay += p.total_amount || 0;
+    if (p.status === 'paid') {
+      result[currency].totalPaid += p.paid_amount || p.total_amount || 0;
+    }
+  }
+
+  for (const currency of ['ARS', 'USD'] as CurrencyType[]) {
+    result[currency].remainingToPay = result[currency].totalToPay - result[currency].totalPaid;
+  }
+
+  return result;
 }
 
 /**
@@ -552,14 +583,56 @@ interface LoanStatsRow {
   status: string;
   total_amount: number;
   principal_amount: number;
+  currency: CurrencyType | null;
 }
 
-export async function getLoanStats() {
+/** Montos de una sola moneda. Nunca mezclar dos de estos entre sí. */
+export interface MoneyStats {
+  totalLent: number;
+  totalExpected: number;
+  totalRecovered: number;
+  totalPending: number;
+}
+
+export interface LoanStats {
+  // Conteos: no dependen de la moneda
+  totalLoans: number;
+  activeLoans: number;
+  completedLoans: number;
+  /** Monedas que el usuario realmente tiene en uso, para decidir qué mostrar */
+  currencies: CurrencyType[];
+  /** Montos separados por moneda. Sumarlos entre sí no tiene sentido. */
+  byCurrency: Record<CurrencyType, MoneyStats>;
+}
+
+const emptyMoneyStats = (): MoneyStats => ({
+  totalLent: 0,
+  totalExpected: 0,
+  totalRecovered: 0,
+  totalPending: 0,
+});
+
+/** Valor inicial para el estado de las pantallas, antes de que cargue la query. */
+export const emptyLoanStats = (): LoanStats => ({
+  totalLoans: 0,
+  activeLoans: 0,
+  completedLoans: 0,
+  currencies: [],
+  byCurrency: { ARS: emptyMoneyStats(), USD: emptyMoneyStats() },
+});
+
+/**
+ * Estadísticas del prestamista, **separadas por moneda**.
+ *
+ * ARS y USD no se suman: no hay cotización en el dominio y un total mezclado es
+ * un número que no significa nada (L2). Los conteos de préstamos sí son globales.
+ */
+export async function getLoanStats(): Promise<LoanStats> {
   const { data: { user } } = await supabase.auth.getUser();
 
   const loansResult = await supabase
     .from('loans')
-    .select('id, status, total_amount, principal_amount')
+    .select('id, status, total_amount, principal_amount, currency')
     .eq('lender_id', user?.id ?? '');
 
   if (loansResult.error) throw new Error(handleSupabaseError(loansResult.error));
@@ -567,33 +640,59 @@ export async function getLoanStats() {
   const loansList = (loansResult.data || []) as LoanStatsRow[];
   const loanIds = loansList.map(l => l.id);
 
+  // Los pagos no tienen moneda propia: la heredan del préstamo
+  const currencyOf = new Map<string, CurrencyType>(
+    loansList.map(l => [l.id, l.currency ?? 'ARS'])
+  );
+
   const [paidResult, pendingResult] = await Promise.all([
     loanIds.length
-      ? supabase.from('payments').select('paid_amount').eq('status', 'paid' as never).in('loan_id', loanIds)
+      ? supabase.from('payments').select('loan_id, paid_amount').eq('status', 'paid' as never).in('loan_id', loanIds)
       : Promise.resolve({ data: [], error: null }),
     loanIds.length
-      ? supabase.from('payments').select('total_amount, penalty_amount').eq('status', 'pending' as never).in('loan_id', loanIds)
+      ? supabase.from('payments').select('loan_id, total_amount, penalty_amount').eq('status', 'pending' as never).in('loan_id', loanIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const totalRecovered = ((paidResult.data || []) as { paid_amount: number }[]).reduce(
-    (sum, p) => sum + Number(p.paid_amount), 0
-  );
-  const totalPending = ((pendingResult.data || []) as { total_amount: number; penalty_amount: number }[]).reduce(
-    (sum, p) => sum + Number(p.total_amount) + Number(p.penalty_amount || 0), 0
-  );
-  const totalExpected = loansList.reduce((sum, l) => sum + Number(l.total_amount), 0);
+  if (paidResult.error) throw new Error(handleSupabaseError(paidResult.error));
+  if (pendingResult.error) throw new Error(handleSupabaseError(pendingResult.error));
+
+  const byCurrency: Record<CurrencyType, MoneyStats> = {
+    ARS: emptyMoneyStats(),
+    USD: emptyMoneyStats(),
+  };
+
+  for (const loan of loansList) {
+    const bucket = byCurrency[loan.currency ?? 'ARS'];
+    bucket.totalExpected += Number(loan.total_amount);
+    if (loan.status === 'active') {
+      bucket.totalLent += Number(loan.principal_amount);
+    }
+  }
+
+  for (const p of (paidResult.data || []) as { loan_id: string; paid_amount: number }[]) {
+    const currency = currencyOf.get(p.loan_id);
+    if (currency) byCurrency[currency].totalRecovered += Number(p.paid_amount);
+  }
+
+  for (const p of (pendingResult.data || []) as { loan_id: string; total_amount: number; penalty_amount: number }[]) {
+    const currency = currencyOf.get(p.loan_id);
+    if (currency) {
+      byCurrency[currency].totalPending += Number(p.total_amount) + Number(p.penalty_amount || 0);
+    }
+  }
 
   const activeLoans = loansList.filter(l => l.status === 'active');
+  const currencies = (['ARS', 'USD'] as CurrencyType[]).filter(c =>
+    loansList.some(l => (l.currency ?? 'ARS') === c)
+  );
 
   return {
     totalLoans: activeLoans.length,
     activeLoans: activeLoans.length,
     completedLoans: loansList.filter(l => l.status === 'completed').length,
-    totalLent: activeLoans.reduce((sum, l) => sum + Number(l.principal_amount), 0),
-    totalExpected,
-    totalRecovered,
-    totalPending,
+    currencies,
+    byCurrency,
   };
 }
 
