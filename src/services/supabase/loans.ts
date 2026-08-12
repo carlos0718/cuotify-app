@@ -286,13 +286,25 @@ export async function getLoanById(id: string) {
   return loan;
 }
 
+/**
+ * Préstamos activos **donde el usuario es el prestamista**.
+ *
+ * El filtro por `lender_id` es obligatorio: sin él, el RLS también devuelve los
+ * préstamos donde el usuario figura como prestatario vinculado, y esos no son
+ * suyos. El guard del plan gratuito los contaba contra el límite (L4).
+ * Para el lado deudor existe `getLinkedLoans()`.
+ */
 export async function getActiveLoans() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
   const { data, error } = await supabase
     .from('loans')
     .select(`
       *,
       borrower:borrowers(*)
     `)
+    .eq('lender_id', user.id)
     .eq('status', 'active')
     .order('created_at', { ascending: false });
 
@@ -478,7 +490,11 @@ export async function addBorrowerComment(paymentId: string, comment: string) {
   return data;
 }
 
+/** Cuotas por vencer de los préstamos **otorgados** por el usuario (ver L4). */
 export async function getUpcomingPayments(days: number = 7) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
   const today = new Date();
   const futureDate = new Date();
   futureDate.setDate(today.getDate() + days);
@@ -487,11 +503,12 @@ export async function getUpcomingPayments(days: number = 7) {
     .from('payments')
     .select(`
       *,
-      loan:loans(
+      loan:loans!inner(
         *,
         borrower:borrowers(*)
       )
     `)
+    .eq('loan.lender_id', user.id)
     .eq('status', 'pending')
     .gte('due_date', today.toISOString().split('T')[0])
     .lte('due_date', futureDate.toISOString().split('T')[0])
@@ -501,18 +518,23 @@ export async function getUpcomingPayments(days: number = 7) {
   return data || [];
 }
 
+/** Cuotas vencidas de los préstamos **otorgados** por el usuario (ver L4). */
 export async function getOverduePayments() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
   const today = new Date().toISOString().split('T')[0];
 
   const { data, error } = await supabase
     .from('payments')
     .select(`
       *,
-      loan:loans(
+      loan:loans!inner(
         *,
         borrower:borrowers(*)
       )
     `)
+    .eq('loan.lender_id', user.id)
     .eq('status', 'pending')
     .lt('due_date', today)
     .order('due_date', { ascending: true });
