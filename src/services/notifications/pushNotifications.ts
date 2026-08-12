@@ -1,8 +1,13 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../supabase/client';
+
+// Expo Go dejó de soportar push remoto en Android a partir del SDK 53.
+// Las notificaciones locales (recordatorios de cuotas) sí siguen funcionando.
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 // ── Almacenamiento local de IDs de notificaciones programadas ────────────────
 const NOTIF_KEY_PREFIX = 'notif_id:';
@@ -38,6 +43,15 @@ export async function registerForPushNotifications(): Promise<string | null> {
   // Solo funciona en dispositivos físicos
   if (!Device.isDevice) {
     console.log('Push notifications solo funcionan en dispositivos físicos');
+    return null;
+  }
+
+  // En Expo Go (SDK 53+) getExpoPushTokenAsync tira error en Android.
+  // Salimos antes para no ensuciar la consola con un fallo esperado.
+  if (isExpoGo) {
+    console.log(
+      'Push remoto no disponible en Expo Go. Usá un development build para probarlo.'
+    );
     return null;
   }
 
