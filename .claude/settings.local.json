@@ -7,12 +7,9 @@
       "Bash(npx tsc *)",
       "Bash(echo \"exit: $?\")",
       "Bash(npx expo-doctor *)",
-      "Bash(node -e \"const p=require\\('./node_modules/react-native-calendars/package.json'\\); console.log\\('version:',p.version\\); console.log\\('deps:',JSON.stringify\\(p.dependencies,null,2\\)\\); console.log\\('peer:',JSON.stringify\\(p.peerDependencies,null,2\\)\\);\")",
       "Bash(npx eas-cli *)",
-      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{const j=JSON.parse\\(s.slice\\(s.indexOf\\('['\\)\\)\\);const b=j[0];console.log\\('status      :',b.status\\);console.log\\('perfil      :',b.buildProfile\\);console.log\\('version     :',b.appVersion,'build',b.appBuildVersion\\);console.log\\('sdk         :',b.sdkVersion\\);console.log\\('duracion    :',Math.round\\(b.metrics.buildDuration/1000\\)+'s'\\);console.log\\('expira      :',b.expirationDate\\);console.log\\('APK         :',b.artifacts.buildUrl\\);}\\)\")",
       "Bash(git diff *)",
-      "Bash(git add *)",
-      "Bash(git commit -q -m '@ *)"
+      "Bash(git add *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\charly\\Desktop\\workspace\\Cursos-onLine\\HTML"
