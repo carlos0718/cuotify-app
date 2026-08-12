@@ -5,6 +5,7 @@ import {
   TermType,
   InterestType,
   LatePenaltyType,
+  CurrencyType,
 } from '../../types';
 
 /**
@@ -161,9 +162,14 @@ export function calculateEndDate(
 }
 
 /**
- * Formatea un monto como moneda
+ * Formatea un monto como moneda.
+ *
+ * El default es ARS para coincidir con `usePreferencesStore.defaultCurrency`.
+ * Aun así, preferí pasar la moneda explícita: tanto `loans` como `personal_debts`
+ * tienen columna `currency` y un monto mostrado con la moneda equivocada es
+ * información financiera incorrecta, no un detalle de formato.
  */
-export function formatCurrency(amount: number, currency = 'USD'): string {
+export function formatCurrency(amount: number, currency: CurrencyType = 'ARS'): string {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
     currency,
