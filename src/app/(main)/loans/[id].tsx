@@ -18,6 +18,7 @@ interface LoanDetail {
   term_value: number | null;
   term_type: 'weeks' | 'months';
   interest_type?: 'simple' | 'french' | 'open';
+  currency: 'ARS' | 'USD';
   payment_amount: number;
   total_amount: number;
   total_interest: number;
@@ -39,10 +40,12 @@ type PaymentStatus = 'pending' | 'paid' | 'overdue';
 // Componente de item de pago
 function PaymentItem({
   payment,
+  currency,
   onPress,
   penaltyConfig,
 }: {
   payment: Payment;
+  currency: string;
   onPress?: (payment: Payment, status: PaymentStatus, penaltyAmount: number) => void;
   penaltyConfig: {
     gracePeriodDays: number;
@@ -86,7 +89,7 @@ function PaymentItem({
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
-      currency: 'ARS',
+      currency,
       minimumFractionDigits: 0,
     }).format(amount);
   };
@@ -276,7 +279,7 @@ export default function LoanDetailScreen() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
-      currency: 'ARS',
+      currency: loan?.currency || 'ARS',
       minimumFractionDigits: 0,
     }).format(amount);
   };
@@ -483,6 +486,7 @@ export default function LoanDetailScreen() {
               <PaymentItem
                 key={payment.id}
                 payment={payment}
+                currency={loan.currency || 'ARS'}
                 onPress={isReadOnly ? undefined : handlePaymentPress}
                 penaltyConfig={{
                   gracePeriodDays: loan.grace_period_days || 7,

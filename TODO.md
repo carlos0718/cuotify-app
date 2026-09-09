@@ -114,7 +114,7 @@
 - [x] **L2** Stats separadas por moneda en `getLoanStats`, `getDebtStats` y
       `getLinkedLoanPaymentStats`; dashboard, préstamos y deudas apilan una tarjeta
       por moneda
-- [ ] **L1 (resto)** Pasar la moneda en `loans/[id].tsx` (2 formatters) y
+- [x] **L1 (resto)** Pasar la moneda en `loans/[id].tsx` (2 formatters) y
       `calendar/index.tsx` — hoy hardcodean ARS y muestran los préstamos en USD como pesos
 
 # 🟠 Bloque 2 — Requisitos de launch

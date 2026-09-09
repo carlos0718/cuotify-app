@@ -16,6 +16,7 @@ interface CalendarPaymentItem {
   type: 'loan' | 'debt';
   name: string;
   parentId: string;
+  currency: 'ARS' | 'USD';
 }
 
 export default function CalendarScreen() {
@@ -35,6 +36,7 @@ export default function CalendarScreen() {
       type: 'loan' as const,
       name: p.loan?.borrower?.full_name || 'Sin nombre',
       parentId: p.loan?.id || '',
+      currency: p.loan?.currency || 'ARS',
     }));
 
   const mapDebtPayments = (data: any[]): CalendarPaymentItem[] =>
@@ -47,6 +49,7 @@ export default function CalendarScreen() {
       type: 'debt' as const,
       name: (p as any).debt?.creditor_name || 'Sin nombre',
       parentId: (p as any).debt?.id || '',
+      currency: (p as any).debt?.currency || 'ARS',
     }));
 
   const loadData = async () => {
@@ -163,10 +166,10 @@ export default function CalendarScreen() {
     return allPayments.slice(0, 5);
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, currency: 'ARS' | 'USD' = 'ARS') => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
-      currency: 'ARS',
+      currency,
       minimumFractionDigits: 0,
     }).format(amount);
   };
@@ -306,7 +309,7 @@ export default function CalendarScreen() {
                     </View>
                     <View style={styles.paymentFooter}>
                       <Text style={styles.paymentType}>Cuota #{payment.payment_number}</Text>
-                      <Text style={styles.paymentAmount}>{formatCurrency(payment.total_amount)}</Text>
+                      <Text style={styles.paymentAmount}>{formatCurrency(payment.total_amount, payment.currency)}</Text>
                     </View>
                   </TouchableOpacity>
                 );
@@ -370,7 +373,7 @@ export default function CalendarScreen() {
                         {status === 'overdue' && ' • Vencido'}
                       </Text>
                       <Text style={[styles.upcomingAmount, status === 'overdue' && { color: colors.error }]}>
-                        {formatCurrency(payment.total_amount)}
+                        {formatCurrency(payment.total_amount, payment.currency)}
                       </Text>
                     </View>
                   </View>

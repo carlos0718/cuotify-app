@@ -216,7 +216,7 @@ política de privacidad publicada — también obligatoria.
 
 ## 2. Lógica de negocio y corrección de datos
 
-### 🔴 L1 · Diez implementaciones duplicadas de `formatCurrency`, la mitad con ARS fija
+### ✅ L1 · Diez implementaciones duplicadas de `formatCurrency`, la mitad con ARS fija — Resuelto (el bug de moneda; la duplicación sigue, ver Fix correcto)
 
 > **Corregido el 2026-08-11.** La versión original de este hallazgo decía que el
 > default `'USD'` de `formatCurrency` hacía que la UI mostrara pesos como `US$`.
@@ -245,7 +245,14 @@ mismo monto se ve distinto según la pantalla.
 
 **Estado:** el default del helper compartido se cambió a `'ARS'` y se tipó el
 parámetro como `CurrencyType`; `dashboard`, `debts/index` y `loans/index` ya reciben
-la moneda. **Quedan pendientes** las dos de `loans/[id].tsx` y la de `calendar/index.tsx`.
+la moneda. Las dos de `loans/[id].tsx` (`PaymentItem` y el componente principal)
+ahora toman `currency` por prop / `loan?.currency`, siguiendo el mismo patrón que
+`debts/[id].tsx`. `calendar/index.tsx` combina pagos de préstamos y deudas en una
+sola lista que puede mezclar monedas por fila, así que `formatCurrency` pasó a
+recibir la moneda como segundo parámetro (no una sola de closure) y cada
+`CalendarPaymentItem` carga su propia `currency`, tomada de `p.loan?.currency` /
+`p.debt?.currency` en el mapeo. Ningún bug de constraint de por medio acá, solo
+faltaba pasar el dato que la query ya traía.
 
 **Fix correcto:** eliminar las 10 locales y dejar un único `<Money amount currency />`
 en `components/common/` (parte de A1), con una sola decisión de formato.
