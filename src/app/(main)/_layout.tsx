@@ -1,12 +1,12 @@
 import { Tabs, Redirect, router } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { ColorValue, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useAuthStore } from '../../store';
 import { colors, fontSize, fontWeight } from '../../theme';
 
 // Iconos SVG personalizados
-function HomeIcon({ color, size = 24 }: { color: string; size?: number }) {
+function HomeIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -27,7 +27,7 @@ function HomeIcon({ color, size = 24 }: { color: string; size?: number }) {
   );
 }
 
-function WalletIcon({ color, size = 24 }: { color: string; size?: number }) {
+function WalletIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -48,7 +48,7 @@ function WalletIcon({ color, size = 24 }: { color: string; size?: number }) {
   );
 }
 
-function CalendarIcon({ color, size = 24 }: { color: string; size?: number }) {
+function CalendarIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Rect
@@ -87,7 +87,7 @@ function CalendarIcon({ color, size = 24 }: { color: string; size?: number }) {
   );
 }
 
-function DebtsIcon({ color, size = 24 }: { color: string; size?: number }) {
+function DebtsIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -122,7 +122,7 @@ function DebtsIcon({ color, size = 24 }: { color: string; size?: number }) {
   );
 }
 
-function SettingsIcon({ color, size = 24 }: { color: string; size?: number }) {
+function SettingsIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="12" r="3" stroke={color} strokeWidth="2" />

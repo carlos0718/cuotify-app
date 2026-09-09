@@ -35,7 +35,8 @@
       "expo-router",
       "expo-notifications",
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true
