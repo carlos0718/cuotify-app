@@ -78,8 +78,8 @@ UPDATE` completo para el prestamista (que hoy pasa por la policy `FOR ALL`).
 
 </details>
 
-### 🔴 S2 · Cualquier usuario puede insertar notificaciones a cualquier otro
-`supabase/migrations/001_initial_schema.sql`
+### ✅ S2 · Cualquier usuario puede insertar notificaciones a cualquier otro — Resuelto
+`supabase/migrations/010_fix_notifications_insert_rls.sql`
 
 ```sql
 CREATE POLICY "El sistema puede crear notificaciones"
@@ -89,10 +89,14 @@ CREATE POLICY "El sistema puede crear notificaciones"
 Vector de spam/phishing dentro de la app: se pueden inyectar notificaciones con
 título y cuerpo arbitrarios a la bandeja de otro usuario.
 
-**Fix:** las notificaciones deberían escribirse solo desde el service role (Edge
-Functions y triggers). Reemplazar por `WITH CHECK (auth.uid() = user_id)` si la app
-necesita escribir localmente, o eliminar la policy y dejar que solo el service role
-inserte.
+Se comprobó que ningún código cliente usa esta policy: no hay un solo
+`.from('notifications')` en `src/`. El centro de notificaciones
+(`src/app/(main)/notifications/index.tsx`) arma la lista en el cliente a partir de
+`payments`, no lee la tabla. El único escritor real es la Edge Function
+`send-payment-reminders`, que usa la `service_role` key y por lo tanto bypassea RLS
+igual. Se eliminó la policy con `DROP POLICY` — no hacía falta reemplazarla por
+`WITH CHECK (auth.uid() = user_id)` porque no hay ningún flujo que necesite insertar
+desde el cliente. Verificado en producción (`pg_policy` ya no la lista).
 
 ### ✅ S3 · Drift entre `supabase/migrations/` y la base real — Resuelto
 Se hizo `pg_dump --schema-only` contra la base real (`cuotify`, `iqiclocyjemrynksiycg`)
