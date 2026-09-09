@@ -25,7 +25,7 @@
 - [x] Trigger `after_loan_insert` que genera el cronograma
 - [x] Trigger de creación automática de perfil al registrarse
 - [x] Migraciones 003-007: interest_type, mora, moneda, deudas personales, RPC de intereses
-- [ ] 🔴 **Dump del schema real y sincronizar `supabase/migrations/`** — § S3 *(empezar por acá)*
+- [x] 🔴 **Dump del schema real y sincronizar `supabase/migrations/`** — § S3
 - [ ] 🔴 Migración 008: soporte real de `interest_type: 'open'` (term_value / end_date nullable) — § S4
 - [ ] 🔴 Migración 009: cerrar la policy de UPDATE de prestatarios con column grants — § S1
 - [ ] 🔴 Migración 010: cerrar el INSERT abierto de notificaciones — § S2
@@ -102,11 +102,11 @@
 
 # 🔴 Bloque 1 — Bugs de datos y seguridad (antes que nada)
 
-- [ ] **S3** Dump del schema real y sincronizar migraciones *(habilita S4 y L3)*
+- [x] **S3** Dump del schema real y sincronizar migraciones *(habilita S4 y L3)*
 - [x] **L1** `formatCurrency` default a `'ARS'` + parámetro tipado como `CurrencyType`
 - [ ] **L3** `interest_rate` overflow con tasas mensuales > 83%
 - [x] **L4** Filtro por `lender_id` en `getActiveLoans`, `getUpcomingPayments` y `getOverduePayments`
-- [ ] **S1** Prestatario puede marcar sus cuotas como pagadas (RLS)
+- [x] **S1** Prestatario puede marcar sus cuotas como pagadas (RLS)
 - [ ] **S2** Cualquiera puede insertar notificaciones a cualquiera (RLS)
 - [ ] **S4** Préstamo abierto viola 3 constraints
 - [x] **L2** Stats separadas por moneda en `getLoanStats`, `getDebtStats` y

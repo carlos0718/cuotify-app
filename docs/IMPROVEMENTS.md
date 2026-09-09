@@ -17,7 +17,22 @@
 
 ## 1. Seguridad y datos
 
-### 🔴 S1 · Un prestatario puede marcar sus propias cuotas como pagadas
+### ✅ S1 · Un prestatario puede marcar sus propias cuotas como pagadas — Resuelto
+`supabase/migrations/009_fix_payment_update_rls.sql`
+
+El fix original (column-level `GRANT`) no funciona en este schema: prestamista y
+prestatario comparten el rol Postgres `authenticated`, así que restringir columnas
+por `GRANT` los restringe a **ambos**, rompiendo `markPaymentAsPaid` del prestamista.
+Se optó por un trigger `BEFORE UPDATE` (`enforce_borrower_payment_columns`) que
+permite la fila completa cuando quien edita es el `lender_id` del préstamo, y si no,
+verifica que solo haya cambiado `borrower_comment` / `borrower_comment_date` —
+si no, `RAISE EXCEPTION`. La policy de RLS sigue existiendo como primera barrera
+(visibilidad de fila) y ahora tiene `WITH CHECK` explícito. Aplicado y verificado
+contra producción (`pg_policy` / `pg_trigger`).
+
+<details>
+<summary>Análisis original (el fix propuesto ahí no se usó, ver arriba)</summary>
+
 `supabase/migrations/001_initial_schema.sql`
 
 ```sql
@@ -61,6 +76,8 @@ Los column-grants son la pieza clave: las policies de RLS no saben de columnas, 
 que la restricción tiene que venir del `GRANT`. Falta además reinstaurar el `GRANT
 UPDATE` completo para el prestamista (que hoy pasa por la policy `FOR ALL`).
 
+</details>
+
 ### 🔴 S2 · Cualquier usuario puede insertar notificaciones a cualquier otro
 `supabase/migrations/001_initial_schema.sql`
 
@@ -77,11 +94,22 @@ Functions y triggers). Reemplazar por `WITH CHECK (auth.uid() = user_id)` si la 
 necesita escribir localmente, o eliminar la policy y dejar que solo el service role
 inserte.
 
-### 🔴 S3 · Drift entre `supabase/migrations/` y la base real
-`transfer_proof_url` se usa en 6 archivos del código y **no aparece en ninguna
-migración**. Lo mismo pasa con `interest_type: 'open'`, que el `CHECK` de la
-migración 003 no admite. Consecuencia: **no se puede reconstruir la base desde cero**
-con lo que hay en el repo, y no hay forma de saber qué más falta.
+### ✅ S3 · Drift entre `supabase/migrations/` y la base real — Resuelto
+Se hizo `pg_dump --schema-only` contra la base real (`cuotify`, `iqiclocyjemrynksiycg`)
+y se comparó contra las migraciones locales. Drift encontrado:
+
+- `supabase migration list` mostraba **003 a 007 nunca registradas** en el historial
+  remoto (se habían aplicado a mano por el dashboard) aunque su contenido sí estaba
+  en la base → reparado con `supabase migration repair --status applied 003..007`.
+- `transfer_proof_url` en `loans` y `personal_debts`, la tabla `notification_preferences`
+  completa (con su policy y trigger), y la policy `"Profiles are viewable by
+  authenticated users"` en `profiles` (necesaria para vincular por DNI y para que el
+  prestatario vea el nombre de su prestamista) existían en producción sin estar en
+  ninguna migración → documentado en `supabase/migrations/008_sync_schema.sql`
+  (idempotente) y aplicado.
+
+`interest_type: 'open'` sigue sin estar soportado por el `CHECK` — eso es § S4, tarea
+aparte, ahora desbloqueada.
 
 **Fix (prioridad máxima, es barato):**
 
