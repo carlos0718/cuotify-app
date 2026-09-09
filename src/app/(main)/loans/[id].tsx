@@ -15,7 +15,7 @@ interface LoanDetail {
   id: string;
   principal_amount: number;
   interest_rate: number;
-  term_value: number;
+  term_value: number | null;
   term_type: 'weeks' | 'months';
   interest_type?: 'simple' | 'french' | 'open';
   payment_amount: number;
@@ -23,7 +23,7 @@ interface LoanDetail {
   total_interest: number;
   delivery_date: string;
   first_payment_date: string;
-  end_date: string;
+  end_date: string | null;
   status: 'active' | 'completed' | 'defaulted' | 'cancelled';
   borrower: Borrower | null;
   lender: { id: string; full_name: string } | null;
@@ -281,7 +281,8 @@ export default function LoanDetailScreen() {
     }).format(amount);
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '—';
     const date = new Date(dateStr + 'T12:00:00');
     return date.toLocaleDateString('es-AR', {
       day: '2-digit',
@@ -380,14 +381,18 @@ export default function LoanDetailScreen() {
             </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Plazo:</Text>
-              <Text style={styles.detailValue}>{loan.term_value} {termTypeLabel}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Cuota:</Text>
-              <Text style={[styles.detailValue, styles.detailValueHighlight]}>
-                {formatCurrency(loan.payment_amount)}/{paymentPeriodLabel}
+              <Text style={styles.detailValue}>
+                {loan.term_value != null ? `${loan.term_value} ${termTypeLabel}` : 'Abierto (sin plazo fijo)'}
               </Text>
             </View>
+            {loan.term_value != null && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Cuota:</Text>
+                <Text style={[styles.detailValue, styles.detailValueHighlight]}>
+                  {formatCurrency(loan.payment_amount)}/{paymentPeriodLabel}
+                </Text>
+              </View>
+            )}
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Total intereses:</Text>
               <Text style={styles.detailValue}>{formatCurrency(loan.total_interest)}</Text>

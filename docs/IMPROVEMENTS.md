@@ -125,7 +125,28 @@ supabase db dump --schema public --file supabase/schema_actual.sql
 A partir de ahí, regla dura: **ningún cambio de schema por el dashboard** — todo
 por migración versionada.
 
-### 🔴 S4 · La feature de préstamo abierto viola tres constraints
+### ✅ S4 · La feature de préstamo abierto viola tres constraints — Resuelto
+`supabase/migrations/011_support_open_loans.sql`
+
+Confirmado con S3: la base real no tenía parcheado nada de esto, la feature estaba
+completamente rota (el INSERT fallaba). Fix aplicado tal cual lo proponía este
+hallazgo — `term_value`/`end_date` nullable, `CHECK` de `term_value` y de
+`interest_type` actualizados — más un ajuste no previsto acá: `generate_payment_schedule()`
+(el trigger `after_loan_insert`) hacía `FOR i IN 1..term_value LOOP`, que revienta con
+`term_value NULL`; se le agregó un `RETURN` temprano para préstamos abiertos (no
+generan cronograma). También se sacó el `as never` de `create.tsx`, se manda
+`term_value: null` en vez de `0`, `loanCalculator.ts` ya no cae en la fórmula
+francesa para `'open'` (relacionado a § L10), y `loans/[id].tsx` ya no muestra
+"Invalid Date" / plazo `null` para estos préstamos. Falta todavía: no hay forma de
+registrar un pago suelto contra un préstamo abierto (no es parte de este hallazgo,
+queda anotado en `TODO.md`).
+
+Probado con un INSERT real (dentro de una transacción con `ROLLBACK`) contra
+producción: el trigger corre sin error y genera 0 pagos, como se espera.
+
+<details>
+<summary>Análisis original</summary>
+
 `src/app/(main)/loans/create.tsx:262-283` inserta, para `interest_type === 'open'`:
 
 | Valor enviado | Constraint en migrations | Resultado |
@@ -142,6 +163,8 @@ resolver S3 primero.
 **Fix (además de S3):** para préstamos abiertos usar `term_value` nullable con
 `CHECK (term_value IS NULL OR term_value > 0)`, `end_date` nullable, y ampliar el
 `CHECK` de `interest_type`. Y quitar el `as never` de esa línea.
+
+</details>
 
 ### 🔴 S5 · API key de RevenueCat hardcodeada en el código fuente
 `src/services/subscription/index.ts:11-14` y también publicada en `SUBSCRIPTION_PLAN.md:67`.

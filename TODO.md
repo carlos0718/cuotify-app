@@ -26,7 +26,7 @@
 - [x] Trigger de creación automática de perfil al registrarse
 - [x] Migraciones 003-007: interest_type, mora, moneda, deudas personales, RPC de intereses
 - [x] 🔴 **Dump del schema real y sincronizar `supabase/migrations/`** — § S3
-- [ ] 🔴 Migración 008: soporte real de `interest_type: 'open'` (term_value / end_date nullable) — § S4
+- [x] 🔴 Migración 011: soporte real de `interest_type: 'open'` (term_value / end_date nullable) — § S4
 - [ ] 🔴 Migración 009: cerrar la policy de UPDATE de prestatarios con column grants — § S1
 - [x] 🔴 Migración 010: cerrar el INSERT abierto de notificaciones — § S2
 - [ ] 🔴 Migración 011: `interest_rate` a `DECIMAL(8,2)` — § L3
@@ -56,7 +56,9 @@
 - [x] Detalle con cronograma, marcar y revertir cuotas
 - [x] Baja de préstamos completados
 - [x] Import por IA desde documento
-- [ ] 🟡 Préstamo abierto funcionando end-to-end (depende de la migración 008)
+- [ ] 🟡 Préstamo abierto: falta poder registrar pagos ad-hoc (creación y detalle ya
+      funcionan de punta a punta desde la migración 011; no hay UI/servicio para
+      agregar un pago suelto a un préstamo sin cronograma fijo)
 - [ ] Registrar **pago parcial** (el estado `partial` ya existe en el schema) — § P1
 - [ ] Transiciones a `defaulted` y `cancelled`
 - [ ] Recibo individual por cuota, compartible — § P2
@@ -108,7 +110,7 @@
 - [x] **L4** Filtro por `lender_id` en `getActiveLoans`, `getUpcomingPayments` y `getOverduePayments`
 - [x] **S1** Prestatario puede marcar sus cuotas como pagadas (RLS)
 - [x] **S2** Cualquiera puede insertar notificaciones a cualquiera (RLS)
-- [ ] **S4** Préstamo abierto viola 3 constraints
+- [x] **S4** Préstamo abierto viola 3 constraints
 - [x] **L2** Stats separadas por moneda en `getLoanStats`, `getDebtStats` y
       `getLinkedLoanPaymentStats`; dashboard, préstamos y deudas apilan una tarjeta
       por moneda

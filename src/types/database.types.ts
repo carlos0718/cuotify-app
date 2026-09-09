@@ -95,7 +95,7 @@ export interface Database {
           borrower_id: string;
           principal_amount: number;
           interest_rate: number;
-          term_value: number;
+          term_value: number | null;
           term_type: 'weeks' | 'months';
           interest_type: 'simple' | 'french' | 'open';
           currency: 'ARS' | 'USD';
@@ -104,7 +104,7 @@ export interface Database {
           total_amount: number;
           delivery_date: string;
           first_payment_date: string;
-          end_date: string;
+          end_date: string | null;
           status: 'active' | 'completed' | 'defaulted' | 'cancelled';
           reminder_days_before: number;
           color_code: string;
@@ -122,7 +122,7 @@ export interface Database {
           borrower_id: string;
           principal_amount: number;
           interest_rate: number;
-          term_value: number;
+          term_value?: number | null;
           term_type: 'weeks' | 'months';
           interest_type?: 'simple' | 'french' | 'open';
           currency?: 'ARS' | 'USD';
@@ -131,7 +131,7 @@ export interface Database {
           total_amount: number;
           delivery_date: string;
           first_payment_date: string;
-          end_date: string;
+          end_date?: string | null;
           status?: 'active' | 'completed' | 'defaulted' | 'cancelled';
           reminder_days_before?: number;
           color_code?: string;
@@ -149,7 +149,7 @@ export interface Database {
           borrower_id?: string;
           principal_amount?: number;
           interest_rate?: number;
-          term_value?: number;
+          term_value?: number | null;
           term_type?: 'weeks' | 'months';
           interest_type?: 'simple' | 'french' | 'open';
           currency?: 'ARS' | 'USD';
@@ -158,7 +158,7 @@ export interface Database {
           total_amount?: number;
           delivery_date?: string;
           first_payment_date?: string;
-          end_date?: string;
+          end_date?: string | null;
           status?: 'active' | 'completed' | 'defaulted' | 'cancelled';
           reminder_days_before?: number;
           color_code?: string;

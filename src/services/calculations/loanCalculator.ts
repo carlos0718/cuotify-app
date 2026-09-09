@@ -40,7 +40,12 @@ export function calculateLoanPayment(
   let totalInterest: number;
   let totalAmount: number;
 
-  if (periodicRate === 0) {
+  if (interestType === 'open') {
+    // Préstamo abierto: sin plazo fijo, no hay cuota ni cronograma que calcular acá
+    paymentAmount = 0;
+    totalInterest = 0;
+    totalAmount = principalAmount;
+  } else if (periodicRate === 0) {
     // Préstamo sin interés
     paymentAmount = principalAmount / termValue;
     totalInterest = 0;
