@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(git tag *)",
+      "Bash(git branch -d *)",
+      "Bash(git branch -D *)"
+    ]
+  }
+}

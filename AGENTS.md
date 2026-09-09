@@ -1,10 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-@AGENTS.md
-
-> **Nota para Claude Code**: la línea `@AGENTS.md` de arriba importa el contenido de `AGENTS.md` (stack, comandos, convenciones, y el flujo Spec-Anchored) a esta sesión. Si tu versión de Claude Code no soporta imports con `@`, pedile directamente a Claude que lea `AGENTS.md` al arrancar la sesión — tiene toda la info operativa del proyecto.
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -113,9 +109,9 @@ Each loan gets a pastel `color_code` from the `colors.loanColors` palette (`src/
 - **Supabase queries**: Always call `handleSupabaseError(error)` when re-throwing errors
 - **Type casting**: Many Supabase responses require `as never` on inserts/updates due to generated type strictness — this is an existing pattern, not a bug
 
-## Subagents (.claude/agents/)
+## Subagents (.Codex/agents/)
 
-Three specialized subagents are configured for this project. Invoke them with `@"name (agent)"` or Claude will select automatically.
+Three specialized subagents are configured for this project. Invoke them with `@"name (agent)"` or Codex will select automatically.
 
 | Subagent | Covers |
 |----------|--------|
@@ -141,10 +137,10 @@ Three specialized subagents are configured for this project. Invoke them with `@
 
 | Value | Model | When to use |
 |-------|-------|-------------|
-| `haiku` | Claude Haiku | Simple tasks, search, fast exploration — cheapest |
-| `sonnet` | Claude Sonnet | Most tasks — good balance of speed and capability |
-| `opus` | Claude Opus | Complex reasoning, deep analysis — slowest and most expensive |
-| `inherit` | Same as parent | Subagent uses whatever model Claude Code is running with |
+| `haiku` | Codex Haiku | Simple tasks, search, fast exploration — cheapest |
+| `sonnet` | Codex Sonnet | Most tasks — good balance of speed and capability |
+| `opus` | Codex Opus | Complex reasoning, deep analysis — slowest and most expensive |
+| `inherit` | Same as parent | Subagent uses whatever model Codex is running with |
 
 ---
 
@@ -155,7 +151,7 @@ Three specialized subagents are configured for this project. Invoke them with `@
 | File | Answers | Update when |
 |---|---|---|
 | `SPEC.md` | **What** the product is: domain model, features, acceptance criteria, risks | Before writing code for any new feature |
-| `CLAUDE.md` (this file) | **How** to work in this codebase | When a convention changes |
+| `AGENTS.md` (this file) | **How** to work in this codebase | When a convention changes |
 | `TODO.md` | **What's next**, in priority order | Every completed task |
 | `docs/IMPROVEMENTS.md` | **What's wrong** — full audit with IDs (S1, L3, A2, U4…) | When a finding is fixed or a new one is found |
 | `design-system/MASTER.md` | Design tokens, component inventory, usage rules | When tokens or shared components change |
@@ -232,3 +228,4 @@ but it is **not safe**: `end_date: null as never` in `loans/create.tsx` silenced
 `NOT NULL` violation (finding S4). Prefer regenerating the Supabase types over adding
 new casts, and when a cast is unavoidable, verify the value against the actual column
 constraint first.
+
