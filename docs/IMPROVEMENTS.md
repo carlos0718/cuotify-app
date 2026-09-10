@@ -270,7 +270,9 @@ por moneda (o un selector). Nunca sumar monedas distintas, aunque haya cotizaci�
 type StatsPorMoneda = Record<CurrencyType, { totalLent: number; totalRecovered: number; /* … */ }>;
 ```
 
-### 🔴 L3 · Overflow numérico con tasas mensuales altas
+### ✅ L3 · Overflow numérico con tasas mensuales altas — Resuelto
+`supabase/migrations/012_widen_loan_interest_rate.sql`
+
 `src/app/(main)/loans/create.tsx:266` guarda `parseFloat(interestRate) * 12` en una
 columna `interest_rate DECIMAL(5,2)` (máximo 999,99). La validación de la línea 171
 solo rechaza `> 999` **mensual**.
@@ -280,8 +282,14 @@ que se le muestra al usuario como error críptico después de completar 3 pasos 
 formulario. En el mercado de préstamos informales argentino, tasas mensuales de 15-30%
 son normales y de 100% no son inauditas.
 
-**Fix:** `ALTER TABLE loans ALTER COLUMN interest_rate TYPE DECIMAL(8,2);` y ajustar la
-validación del formulario a un tope coherente con lo que la columna aguanta.
+Se amplió la columna a `DECIMAL(8,2)` (máximo 999.999,99 anual, ~83.333% mensual).
+No hizo falta tocar la validación del formulario: el tope que ya exige (`> 999`
+mensual, es decir hasta 11.988 anual) queda muy por debajo de lo que la columna
+ampliada acepta, así que con el ALTER alcanza para que ambos queden coherentes.
+`personal_debts.interest_rate` no tiene este bug — ahí la tasa se guarda directo,
+sin `× 12`, y el tope de validación (999) ya coincidía con el límite real de esa
+columna (`DECIMAL(5,2)`). Probado con un INSERT real (1800% anual = 150% mensual,
+que antes desbordaba) dentro de una transacción con `ROLLBACK` contra producción.
 
 ### 🔴 L4 · El límite del plan free cuenta préstamos donde el usuario es deudor
 `src/app/(main)/loans/create.tsx:218` llama a `getActiveLoans()`, que en

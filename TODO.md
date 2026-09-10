@@ -106,7 +106,7 @@
 
 - [x] **S3** Dump del schema real y sincronizar migraciones *(habilita S4 y L3)*
 - [x] **L1** `formatCurrency` default a `'ARS'` + parámetro tipado como `CurrencyType`
-- [ ] **L3** `interest_rate` overflow con tasas mensuales > 83%
+- [x] **L3** `interest_rate` overflow con tasas mensuales > 83%
 - [x] **L4** Filtro por `lender_id` en `getActiveLoans`, `getUpcomingPayments` y `getOverduePayments`
 - [x] **S1** Prestatario puede marcar sus cuotas como pagadas (RLS)
 - [x] **S2** Cualquiera puede insertar notificaciones a cualquiera (RLS)
