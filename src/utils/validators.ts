@@ -27,7 +27,6 @@ const COMMON_TLD_TYPOS: Record<string, string> = {
   'xom': 'com',
   'nte': 'net',
   'ney': 'net',
-  'nte': 'net',
   'ogr': 'org',
   'prg': 'org',
   'orh': 'org',
@@ -39,6 +38,7 @@ export interface EmailValidationResult {
   isValid: boolean;
   error?: string;
   suggestion?: string;
+  warning?: string;
 }
 
 /**
@@ -110,25 +110,26 @@ export function validateEmail(email: string): EmailValidationResult {
     };
   }
 
-  // Verificar si el TLD es válido
-  const isValidTld = VALID_TLDS.includes(lastPart) ||
+  // Verificar si el TLD está en la allowlist conocida. No es un error si no lo
+  // está: la allowlist envejece (.tech, .ai, etc. son válidos y no están acá).
+  // Solo se avisa, sin bloquear — la verificación real la da el email de confirmación.
+  const isKnownTld = VALID_TLDS.includes(lastPart) ||
                      (compoundTld && VALID_TLDS.includes(compoundTld));
 
-  if (!isValidTld) {
-    // Buscar TLD similar para sugerir
+  if (!isKnownTld) {
     const similarTld = findSimilarTld(lastPart);
     if (similarTld) {
       const correctedEmail = trimmedEmail.replace(new RegExp(`\\.${lastPart}$`), `.${similarTld}`);
       return {
-        isValid: false,
-        error: `El dominio ".${lastPart}" parece incorrecto. ¿Quisiste decir ".${similarTld}"?`,
+        isValid: true,
+        warning: `El dominio ".${lastPart}" es poco común. ¿Quisiste decir ".${similarTld}"?`,
         suggestion: correctedEmail,
       };
     }
 
     return {
-      isValid: false,
-      error: `El dominio ".${lastPart}" no parece ser válido`,
+      isValid: true,
+      warning: `El dominio ".${lastPart}" es poco común, pero se puede continuar`,
     };
   }
 

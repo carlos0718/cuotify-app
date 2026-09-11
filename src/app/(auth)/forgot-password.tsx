@@ -23,7 +23,7 @@ export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError, showWarning } = useToast();
 
   const handleSendCode = async () => {
     if (!email.trim()) {
@@ -36,6 +36,9 @@ export default function ForgotPasswordScreen() {
     if (!emailValidation.isValid) {
       showError('Correo inválido', emailValidation.error || 'El correo no es válido');
       return;
+    }
+    if (emailValidation.warning) {
+      showWarning('Revisá tu correo', emailValidation.warning);
     }
 
     setIsLoading(true);

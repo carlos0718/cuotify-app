@@ -23,7 +23,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
 
   const { signIn, isLoading, clearError } = useAuthStore();
-  const { showError } = useToast();
+  const { showError, showWarning } = useToast();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -36,6 +36,9 @@ export default function LoginScreen() {
     if (!emailValidation.isValid) {
       showError('Correo inválido', emailValidation.error || 'El correo no es válido');
       return;
+    }
+    if (emailValidation.warning) {
+      showWarning('Revisá tu correo', emailValidation.warning);
     }
 
     try {
