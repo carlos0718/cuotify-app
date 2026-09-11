@@ -6,6 +6,25 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 **Cuotify** is a React Native / Expo mobile app for managing personal loans. It allows lenders to create and track loans, manage borrowers, and monitor payment schedules. Borrowers can view their own loans and add comments to payments.
 
+## Stack
+
+- **Frontend**: React Native + Expo (SDK 57), Expo Router (file-based navigation)
+- **Backend**: Supabase (Postgres + Auth + Edge Functions en Deno)
+- **ORM / DB**: Supabase JS client directo sobre Postgres, con Row Level Security — sin ORM aparte
+- **Estilos**: Design tokens en `src/theme/` (colors, gradients, typography, spacing, borderRadius, shadow) — sin styled-components ni librería de UI
+- **Testing**: no configurado (sin scripts de lint/test — ver `TODO.md` § Calidad)
+- **Otros**: Zustand (estado global), React Hook Form + Zod (`@hookform/resolvers`), RevenueCat (suscripciones — ver `SUBSCRIPTION_PLAN.md`), Gemini (`src/services/gemini/`), generación de PDF (`src/services/pdf/`), notificaciones push (Expo Notifications)
+
+## Infraestructura de deploy
+
+- **Docker**: no aplica (app móvil, no se containeriza)
+- **Plataforma**: EAS Build / EAS Submit (Expo Application Services) — App Store y Play Store
+- **CI/CD**: no configurado (no hay `.github/workflows/`) — ver `TODO.md` § Infraestructura/Deploy
+- **Archivo de config**: `eas.json` (perfiles `development`, `preview`, `preview-apk`, y el de producción)
+- **Variables de entorno**: `.env.example` documenta `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PROJECT_ID`. Los perfiles de `eas.json` llevan sus propias `env` por build — la `ANON_KEY` de Supabase es pública por diseño (protegida por RLS), pero cualquier secret real (RevenueCat de producción, etc.) va a variables de entorno de EAS, nunca hardcodeado (ver S5 en `CHANGELOG.md`).
+
+> Las variables de entorno nunca van al repo. `.env` está en `.gitignore`. Los secrets de producción se configuran en variables de entorno de EAS (`eas secret` o el bloque `env` del perfil correspondiente en `eas.json`).
+
 ## Commands
 
 ```bash
@@ -99,6 +118,15 @@ Late penalties support: `none`, `fixed` (one-time %), `daily` (% × days overdue
 
 Each loan gets a pastel `color_code` from the `colors.loanColors` palette (`src/theme/colors.ts`). Helpers in `src/utils/loanColors.ts`: `getNextLoanColor(lastColor)` cycles through the palette sequentially; `getLoanColorByIndex(i)` assigns deterministically. The create flow calls `getLastLoanColor()` before saving to ensure sequential assignment.
 
+## Decisiones del setup
+
+> El **qué** se eligió (stack, arquitectura) está arriba. Acá va el **por qué**.
+
+- **Arquitectura**: Layer-based (por capa técnica, no por feature) — la app tiene ~14 pantallas sobre dos dominios paralelos (préstamos/deudas) que comparten casi toda su infraestructura (un cliente Supabase, un motor de cálculo, un theme); feature-based hubiera duplicado ese plumbing. Ver el trade-off que esto paga hoy (extracción a `components/<feature>/`/`hooks/` incompleta) en la sección "Architecture — Layer-based" más abajo.
+- **TDD**: No — no hay tests configurados; se prioriza shippear el MVP y agregar tests a `loanCalculator.ts` cuando el cálculo de intereses/penalidades se toque (ver Testing en `TODO.md` § Calidad).
+- **Versión desincronizada**: la versión del proyecto vive en dos lugares (`package.json` y `app.json`) y hoy están desalineados — unificarlos es la tarea § A9 del `TODO.md`.
+- **Licencia**: propietaria (ver `LICENSE`) — software privado, no se redistribuye.
+
 ## Key Conventions
 
 - **Language**: UI strings are in Spanish (the app targets Spanish-speaking markets)
@@ -108,6 +136,28 @@ Each loan gets a pastel `color_code` from the `colors.loanColors` palette (`src/
 - **Navigation**: Use `expo-router`'s `router.push/replace` and `<Redirect>`. Tab resets use `router.replace('/(main)/loans')` in tab `listeners`
 - **Supabase queries**: Always call `handleSupabaseError(error)` when re-throwing errors
 - **Type casting**: Many Supabase responses require `as never` on inserts/updates due to generated type strictness — this is an existing pattern, not a bug
+
+## Convenciones específicas de este repo
+
+- **Naming**: archivos de pantalla en `camelCase`/`kebab-case` según convención de Expo Router (`[id].tsx` para rutas dinámicas); componentes y stores en `PascalCase`/`camelCase` respectivamente (`useAuthStore`, `LoanCard`).
+- **Commits**: Conventional Commits, subject en español, referenciando el ID del finding cuando aplica (ver "Workflow de Git" más abajo).
+- **Branches**: hoy el repo trabaja directo sobre `master` (no existe `dev` todavía) más alguna rama `fix/*` suelta — ver "Branching — GitFlow simplificado" más abajo para el objetivo y qué falta para llegar ahí.
+
+## Code style — boundaries
+
+Los principios de código, seguridad, tamaño de archivo, y las reglas de "preguntar primero"/"nunca" que gobiernan este proyecto **no viven acá** — viven en **`CONSTITUTION.md`**. Leer `CONSTITUTION.md` antes de tocar código en este proyecto.
+
+**Patrones activos de este proyecto** (detalle completo y justificación en `CONSTITUTION.md` Artículo 5):
+- **Service layer** — todo el acceso a datos pasa por `src/services/supabase/`, nunca queries sueltas en las pantallas.
+- **Store pattern (Zustand)** — `useAuthStore`, `usePreferencesStore`.
+- **Strategy** — `loanCalculator.ts` aplica dos estrategias de interés intercambiables (simple / francés).
+- **Trigger-driven side effects** — cronogramas de pago generados por trigger de Postgres o RPC, no en la capa de aplicación.
+
+## Gotchas / cosas a recordar
+
+- La versión vive en dos archivos (`package.json` y `app.json`) y puede desalinearse — tocar los dos al bumpear (§ A9 del `TODO.md`).
+- El `ANON_KEY` de Supabase en `eas.json` es público por diseño (protegido por RLS) — no es un secret filtrado; lo que nunca debe hardcodearse son las keys de producción de RevenueCat u otro proveedor.
+- `supabase/migrations/` puede estar desincronizado con la DB real si alguna vez se tocó el schema desde el dashboard — ver S3 en `TODO.md`/`docs/IMPROVEMENTS.md`.
 
 ## Subagents (.Codex/agents/)
 
@@ -192,34 +242,202 @@ sub-components, data fetching, business logic — is extracted to
 `components/<feature>/` or `hooks/`. Don't refactor everything at once; extract what
 you touch. See `docs/IMPROVEMENTS.md` § A1 for the target layout.
 
-## Iteration flow — Spec-First
+## Agregar o modificar código — flujo de iteración (Plan → Confirmar → Implementar)
 
-For any new feature or non-trivial change:
+> **Spec-Anchored** es uno de los niveles reconocidos de Spec-Driven Development. Significa que `SPEC.md` es un documento **vivo**: se actualiza en cada cambio de alcance, no solo una vez al principio del proyecto.
 
-1. **Spec** — update `SPEC.md` first: what it does, which invariants it touches, its
-   acceptance criteria. If it changes the domain model, update § 4 too.
-2. **Schema** — if the DB changes, write a **numbered migration** in
-   `supabase/migrations/`. Never change the schema from the Supabase dashboard: that's
-   how the current drift (S3) happened.
-3. **Types** — regenerate `database.types.ts` after any schema change.
-4. **Implementation** — services first, then hooks, then screen.
-5. **Verification** — `npx tsc --noEmit`, plus a unit test if it touches
-   `loanCalculator.ts` (money math is not verified by hand).
-6. **TODO** — check off the task and note anything new that came up.
+**Regla ampliada — no negociable:** ante **cualquier** pedido de cambio (feature nueva o corrección), el código nunca se toca en el mismo paso en que se recibe el pedido. Primero se decide si afecta el alcance de `SPEC.md`, después se muestra un plan breve, y recién con **confirmación explícita del usuario** se implementa.
 
-## Commit convention
+### Paso 1 — ¿Este pedido cambia el alcance de SPEC.md?
 
-One completed task = one commit + push. Conventional commits, subject in Spanish,
-referencing the finding ID when applicable:
+- **Sí** — feature nueva, cambia comportamiento ya documentado, agrega/quita una entidad de dominio, o cambia un requisito no funcional. → Ir al **Paso 2a**.
+- **No** — corrección puntual que no cambia lo que `SPEC.md` ya dice que el sistema debe hacer. → Ir al **Paso 2b**.
+
+Si hay duda real, preguntar antes de asumir.
+
+### Paso 2a — Si cambia el alcance: actualizar SPEC.md primero, después mostrar el plan
 
 ```
-fix(rls): restringir UPDATE de prestatarios a columnas de comentario (S1)
-feat(loans): registrar pago parcial de cuota (P1)
-refactor(loans): extraer LoanCard y PaymentRow a components/loans (A1)
-docs(spec): actualizar criterios de aceptación de préstamo abierto
+1. SPEC.md primero
+   └── Agregar/quitar la feature, actualizar entidades de dominio y schema de DB
+       si aplica, actualizar criterios de aceptación
+
+2. Dominio (si la feature toca entidades o reglas de negocio)
+   └── Actualizar diagrama de entidades y schema en SPEC.md
+   └── Escribir la migración numerada en supabase/migrations/ si cambia el schema
+
+3. Mostrar el plan de implementación técnica — QUÉ se va a tocar, en qué archivos,
+   en qué orden (Dominio/DB → API/Backend → Frontend/UI). NO implementar todavía.
+
+4. Esperar confirmación explícita del usuario.
 ```
 
-Never commit `.env`, API keys, or generated builds.
+**Recién con la confirmación**, commitear la documentación (`docs: agregar feature X — spec y dominio actualizados`) y pasar al Paso 3 (Implementar).
+
+### Paso 2b — Si NO cambia el alcance: mostrar el plan sin tocar SPEC.md ni código
+
+```
+1. Describir en 3-5 líneas: qué se va a cambiar, en qué archivo(s), y por qué.
+2. Terminar con una pregunta explícita — "¿Avanzo con esto?"
+3. Esperar la respuesta. No continuar en el mismo turno asumiendo que sí.
+```
+
+Si en el camino se descubre que en realidad **sí** hay un cambio de alcance escondido, pausar y volver al Paso 1.
+
+### Paso 3 — Implementar (solo después de la confirmación, cualquiera de los dos caminos)
+
+```
+└── Antes de tocar código: ver "Branching — GitFlow simplificado" más abajo
+└── Services first, then hooks/stores, then screen (Dominio/DB → API/Backend → Frontend/UI)
+└── Verificación: npx tsc --noEmit, plus un test unitario si toca loanCalculator.ts
+    (money math no se verifica a mano)
+└── Cada tarea = 1 commit + push (ver "Workflow de Git" más abajo)
+```
+
+### Formato del commit de documentación
+
+```
+docs: agregar feature [nombre] — SPEC y dominio actualizados
+docs: quitar feature [nombre] — SPEC simplificado
+docs: modificar dominio — [entidad] ahora tiene [cambio]
+```
+
+### Por qué este orden importa
+
+Si el código va antes que la spec, en 2 semanas el `SPEC.md` refleja lo que se pensó al principio, no lo que se construyó. El dominio queda desincronizado con la DB real (es justamente cómo pasó el drift S3). El `TODO.md` tiene tareas para features que ya no existen. Spec-Anchored evita eso.
+
+---
+
+## README sync — al completar una sección del TODO
+
+**Regla:** cuando se marca el **último checkbox de una sección completa** del `TODO.md`, actualizar la sección correspondiente del `README.md` antes del commit.
+
+| Sección de TODO.md | Qué actualizar en README.md |
+|---|---|
+| **Setup** | Verificar/completar scripts (`start`, `android`, `ios`, `web`), pasos de instalación y variables de entorno |
+| **Features iniciales / Dominio-DB / API-Backend / Frontend-UI** | Agregar o actualizar la sección "Features" con lo que realmente se construyó |
+| **Calidad** | Actualizar comando de lint/test cuando se configuren, agregar badge si aplica |
+| **Infraestructura / Deploy** | Agregar perfil de EAS usado, hosting de Supabase, y variables de entorno de prod si corresponde |
+| **Seguridad** | No suele necesitar sección propia en el README (proyecto propietario) |
+| **Documentación** | Completar secciones vacías, agregar links a docs adicionales |
+
+**Formato del commit cuando se hace README sync:**
+```
+docs: update README — sección <nombre> completada (TODO: <última tarea>)
+```
+
+**Cuándo NO disparar el sync:** si quedan `- [ ]` sin marcar en la sección; si la sección no tiene impacto visible en el README (refactors internos); si el usuario prefiere controlar el README manualmente (respetar, pero avisar).
+
+---
+
+## Trazabilidad de requisitos
+
+Este proyecto no usa el esquema `RF-N`/`US-N`/`RNF-N` del template base de la skill — ya tenía su propio esquema de **Finding IDs** (ver "Source-of-truth documents" arriba), que cumple la misma función de trazabilidad y se mantiene como fuente de verdad:
+
+- **`S*`** seguridad, **`L*`** lógica, **`A*`** arquitectura, **`U*`** UX, **`P*`** producto/feature nueva.
+- Los IDs son estables — se referencian en el commit que resuelve el hallazgo o implementa la feature: `feat(loans): registrar pago parcial de cuota (P1)`.
+- **Para responder "¿qué tareas implementan S1/L3/A2?"**: `grep -rn "S1\|L3\|A2" SPEC.md TODO.md docs/IMPROVEMENTS.md` — no hay tabla de mapeo aparte que mantener sincronizada, el ID en cada línea es la fuente de verdad.
+- **Al agregar un finding o feature nuevo**: asignarle el próximo ID disponible del tipo correspondiente en `docs/IMPROVEMENTS.md` (findings) o `SPEC.md` (features nuevas vía Spec-Anchored), y taguear las tareas del TODO con ese ID desde que se escriben.
+
+---
+
+## Workflow de Git — 1 user story / tarea = 1 commit + push
+
+El `<tipo>` de cada commit sigue [Conventional Commits](https://www.conventionalcommits.org/) — determina si el cambio entra al changelog y qué tan grande es para SemVer:
+
+| Tipo | Cuándo | ¿Changelog? |
+|---|---|---|
+| `feat` | Feature nueva | Sí — `Added` |
+| `fix` | Corrección de bug | Sí — `Fixed` |
+| `feat!` / `fix!` / footer `BREAKING CHANGE:` | Rompe compatibilidad | Sí — `Changed` (marcado como breaking) |
+| `docs`, `style`, `refactor`, `test`, `build`, `ci`, `chore` | Sin impacto para quien usa el proyecto | No |
+
+Cada ítem del `TODO.md` representa una tarea o finding. Al completar uno:
+
+0. **Spec Drift Check** (ver detalle abajo): ¿el código que estoy por commitear agrega algo que no está en `SPEC.md`? Si sí, actualizar `SPEC.md` primero.
+0-bis. **TODO Size Check** (ver detalle abajo): ¿`TODO.md` se acerca al límite de tamaño?
+0-ter. **Branch Discipline Check**: ¿la rama actual es `master`? Hoy el repo no tiene rama `dev` — este chequeo queda como aviso suave hasta que se decida adoptar GitFlow completo (ver "Branching" abajo) o se confirme explícitamente que se sigue trabajando directo sobre `master`.
+1. Marcar el checkbox en `TODO.md`: `- [ ]` → `- [x]`.
+1-bis. Actualizar `CHANGELOG.md` si el tipo es `feat`, `fix`, o breaking change: agregar una línea bajo `[Unreleased]`.
+2. `git add` de los archivos de código + `TODO.md` + `CHANGELOG.md` si se tocó, todo junto.
+3. Commitear referenciando la tarea/finding:
+   ```
+   fix(rls): restringir UPDATE de prestatarios a columnas de comentario (S1)
+   feat(loans): registrar pago parcial de cuota (P1)
+   refactor(loans): extraer LoanCard y PaymentRow a components/loans (A1)
+   docs(spec): actualizar criterios de aceptación de préstamo abierto
+   ```
+4. `git push` inmediatamente.
+
+Nunca commitear `.env`, API keys, o builds generados.
+
+### Spec Drift Check — el paso 0 en detalle
+
+```bash
+# Rutas nuevas (Expo Router es file-based — un archivo nuevo en src/app/ es un endpoint nuevo de la app)
+git diff --staged --name-only --diff-filter=A | grep -E "^src/app/.*\.tsx$"
+
+# Tablas nuevas en Supabase (migración nueva, o .from("tabla") no visto antes)
+git diff --staged --name-only --diff-filter=A | grep -E "^supabase/migrations/"
+
+# Servicios nuevos (posible entidad/dominio nuevo)
+git diff --staged --name-only --diff-filter=A | grep -E "^src/services/"
+```
+
+Si alguno devuelve resultados y lo que aparece no está mencionado en `SPEC.md` → parar y avisar antes de commitear. Si no hay señales (típico en cambios de UI/estilos/refactors) → seguir directo, no hace falta preguntar.
+
+### TODO Size Check — el paso 0-bis en detalle
+
+Este proyecto usa el modo **único** (`TODO.md`, sin carpeta `todos/`), organizado por capas (Dominio/DB → API/Backend → Frontend/UI).
+
+```bash
+wc -l TODO.md
+```
+
+- **< 300 líneas**: sin acción.
+- **300-500 líneas**: avisar una vez, sin bloquear.
+- **500+ líneas**: proponer migrar a `todos/` (un archivo por capa o por feature) antes de seguir agregando tareas.
+
+## Branching — GitFlow simplificado
+
+**Estado real hoy:** el repo trabaja directo sobre `master` (no hay `main`/`dev` separados) más alguna rama `fix/*` puntual (`fix/bloque-1-datos-y-moneda`). El objetivo de la skill es:
+
+- `master` → producción, siempre en estado deployable (equivalente a `main` del template).
+- `dev` → integración — **todavía no existe en este repo**; crearla es una decisión pendiente (ver `TODO.md`), no algo que se fuerce sin avisar.
+- `feature/<nombre-corto>` → una feature nueva. `fix/<nombre-corto>` → una corrección.
+
+```bash
+# Si se decide adoptar dev
+git checkout master
+git checkout -b dev
+git push -u origin dev
+
+# Al empezar a trabajar en algo nuevo
+git checkout dev   # o master, mientras no exista dev
+git pull
+git checkout -b feature/nombre-corto    # o fix/nombre-corto
+```
+
+**El merge nunca es automático** — después de commitear y pushear una rama `feature/*`/`fix/*`, parar y mostrar un resumen del cambio antes de ejecutar `git merge`, esperando confirmación explícita ("mergeo", "dale", "sí").
+
+## Versionado y releases — Semantic Versioning
+
+Este proyecto sigue [SemVer](https://semver.org/lang/es/) y mantiene `CHANGELOG.md` en formato Keep a Changelog.
+
+- **`[Unreleased]`** se va llenando commit a commit (paso 1-bis del Workflow de Git).
+- **No se taguea en cada commit.** Un release es un build subido a las stores vía EAS Submit — decisión explícita.
+- **Ojo con la versión duplicada**: hoy vive en `package.json` y `app.json` y pueden desalinearse (§ A9 del `TODO.md`) — cualquier bump debe tocar los dos.
+- **Qué bump corresponde**: `fix` → PATCH · `feat` → MINOR · breaking change → MAJOR.
+
+## Gestión de dependencias
+
+- **Pinning**: rango caret (`^1.2.3`) para dependencias de app. El lockfile (`package-lock.json`) siempre commiteado.
+- **Cadencia**: sin Dependabot configurado todavía (§ A8 del `TODO.md`) — mientras tanto, correr `npm audit` manualmente antes de releases grandes.
+- **Licencias de terceros**: no aplica — proyecto propietario, no se redistribuye (evitar igual GPL/AGPL por las restricciones que imponen).
+
+## Próximas decisiones pendientes
+
+Ver `TODO.md` para el detalle.
 
 ## Caveat on the `as never` pattern
 

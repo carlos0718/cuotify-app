@@ -17,6 +17,7 @@
 - [ ] ESLint + `typecheck` en scripts de npm — ver `IMPROVEMENTS.md` § A8
 - [ ] Jest (`jest-expo`) configurado
 - [ ] CI en GitHub Actions (lint + typecheck + test)
+- [ ] Crear rama `dev` desde `master`, si se decide adoptar GitFlow completo (hoy se trabaja directo sobre `master` — ver `AGENTS.md` § "Branching — GitFlow simplificado")
 
 ## Dominio / DB
 
@@ -102,6 +103,30 @@
 - [ ] Productos en App Store Connect y Google Play Console
 - [ ] Paywall diseñado en el dashboard de RevenueCat
 - [ ] Validación server-side del entitlement — § S6
+
+## Infraestructura / Deploy
+
+- [x] EAS Build configurado (perfiles `development`, `preview`, `preview-apk`)
+- [ ] `assets/icon.png` cuadrado 1024×1024 sin canal alfa — bloquea el submit a Apple
+- [ ] Primer build de producción (perfil `production` en `eas.json`, si no existe todavía)
+- [ ] Productos creados en App Store Connect y Google Play Console (ver Monetización)
+- [ ] Primer submit exitoso a TestFlight / internal testing de Play Console
+- [ ] Política de privacidad publicada (bloqueante de Google Play, ver § S8)
+
+## Seguridad
+
+<!-- Checklist OWASP de SECURITY.md que quedó sin marcar y todavía no tenía tarea propia acá -->
+
+- [ ] OWASP A05 · Revisar security headers de las Edge Functions y confirmar que no quede nada en modo debug en producción
+- [ ] OWASP A06 · Dependency scanning en CI — mismo trabajo que § A8 (Bloque 3)
+- [ ] OWASP A07 · Revisar política de password más allá de los defaults de Supabase (rate limiting, complejidad)
+- [ ] OWASP A09 · Error tracking configurado — mismo trabajo que § A5 (Bloque 2, Sentry)
+- [ ] OWASP A10 · Revisar SSRF si el import por IA llega a aceptar URLs externas (hoy no aplica)
+
+## Observabilidad
+
+- [ ] Reemplazar `console.log`/`console.error` sueltos por un logger mínimo con niveles, a medida que se toca cada archivo (no requiere una migración masiva)
+- [ ] Revisar logs de `send-payment-reminders` una vez que exista el schedule automático (ver sección Notificaciones arriba)
 
 ---
 
@@ -201,3 +226,9 @@
 - [ ] **P5** Onboarding en el primer uso
 - [ ] **P6** Resumen diario "a quién cobro hoy"
 - [ ] **P7** Cartera compartida entre socios
+
+## Documentación
+
+- [ ] Completar `README.md` con setup, features reales y estado del proyecto (README sync, ver `AGENTS.md`)
+- [ ] Revisar que las secciones nuevas de `AGENTS.md`/`CLAUDE.md` (agregadas al resolver el drift de contenido del 2026-09-11) no contradigan ninguna convención real del equipo
+- [ ] Agregar diagrama del modelo de dominio (`SPEC.md` § 4.2) como imagen, si se necesita para onboarding de alguien nuevo al proyecto

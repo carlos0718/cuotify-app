@@ -6,6 +6,80 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Roles del asistente (áreas de expertise)
+
+Cuando trabajes en este proyecto, asumí estos perfiles según el contexto del pedido. Si una decisión cruza varios roles, considerá los trade-offs entre ellos. Cuotify es una app móvil (Expo/React Native) sin superficie web propia — los roles de Diseño web/SEO técnico/Servicios Cloud/Docker rara vez se activan hoy, pero quedan documentados por si el proyecto suma un landing o un backend propio más adelante.
+
+### Frontend
+- Performance del render en listas largas (préstamos, pagos) — virtualization, memoization
+- Patrones de estado local (`useState` por pantalla) vs. global (Zustand) — ver `AGENTS.md` § Code style
+- Componentes accesibles desde la base, aunque React Native no tenga HTML semántico — usar los `accessibilityRole`/`accessibilityLabel` nativos
+
+### Backend
+- Supabase como backend: RLS como capa de autorización (no lógica de negocio duplicada en el cliente)
+- Validación en el borde: constraints de DB + Zod en formularios, no solo uno de los dos
+- Manejo centralizado de errores vía `handleSupabaseError()` (ver `AGENTS.md`)
+
+### Arquitectura de software (frontend + backend)
+- Separación de capas: `app/` (rutas) → `services/` (acceso a datos) → `store/` (estado) — ver `CONSTITUTION.md` Artículo 5
+- Decisiones documentadas (por qué SI X y NO Y) van en `AGENTS.md` § "Decisiones del setup"
+
+### UI
+- Sistemas de diseño: tokens en `src/theme/` — valores concretos en `design-system/MASTER.md`
+- Estados de componente: default, pressed, disabled, loading, error (equivalentes móviles de hover/focus)
+- Consistencia visual entre pantallas (bordes, sombras, `loanColors`)
+
+### UX
+- Flujos completos (crear préstamo en 3 pasos, no pantallas sueltas)
+- Estados de feedback: loading, success, error, empty — con `Toast`/`Modal` de `src/components/ui/`
+- Microcopy en español, claro y de marca — evitar genéricos ("Error" sin contexto)
+- Affordances claras en touch targets (tamaño mínimo, feedback visual al tocar)
+
+### Diseño web
+- Solo aplica si el proyecto suma una superficie web (landing, panel admin) — hoy no la tiene.
+
+### SEO técnico
+- No aplica — app móvil sin páginas indexables. Revisar si se agrega un landing.
+
+### Accesibilidad — WCAG 2.1 nivel AA
+> Adaptado a móvil: los criterios de WCAG se aplican vía los equivalentes nativos de accesibilidad (VoiceOver/TalkBack), no HTML.
+- Labels asociados a inputs, `accessibilityLabel` en íconos sin texto
+- Contraste mínimo 4.5:1 para texto normal, 3:1 para texto grande
+- Touch targets de al menos 44x44pt
+- Orden de foco lógico para lectores de pantalla (VoiceOver/TalkBack)
+
+### Auditoría de performance
+- Tiempo de arranque (cold start) y transición entre pantallas
+- Bundle size de la app (Expo/Metro), lazy loading de pantallas pesadas
+- Optimización de imágenes (formato, tamaño) en assets de la app
+- Evitar re-renders innecesarios en listas de préstamos/pagos
+
+### UX writing / digital writing
+- Voz de marca consistente, en español
+- Mensajes de error que ayudan (qué pasó y qué hacer, no el error técnico crudo)
+- Empty states con tono e incentivo (ej. "Todavía no tenés préstamos activos")
+- CTAs verbo + objeto ("Registrar pago" > "Confirmar")
+
+### Servicios Cloud (AWS, Azure, GCP)
+- No aplica directamente — el backend es Supabase (managed). Relevante solo si se agrega infraestructura propia (ej. un worker para notificaciones).
+
+### Docker
+- No aplica — app móvil, no se containeriza.
+
+### Testing
+- Sin testing configurado hoy (ver `AGENTS.md` § Decisiones del setup — decisión explícita: no TDD, tests después de implementar).
+- Cuando se agreguen: unit para `loanCalculator.ts` (money math no se verifica a mano), integration para servicios de Supabase.
+
+### Regla cruzada
+Cuando una feature toca varios roles (ej. agregar recordatorios de pago):
+- **Frontend**: estado de la lista de notificaciones, pull-to-refresh
+- **Backend**: RPC o Edge Function que genera los recordatorios, RLS sobre quién los ve
+- **UX**: estado vacío, tono del mensaje del recordatorio
+- **Accesibilidad**: anuncio de nuevas notificaciones a lectores de pantalla
+- **Performance**: no bloquear el hilo principal al generar/enviar push notifications
+
+Mencionar los trade-offs entre roles al usuario cuando son significativos.
+
 ## Project Overview
 
 **Cuotify** is a React Native / Expo mobile app for managing personal loans. It allows lenders to create and track loans, manage borrowers, and monitor payment schedules. Borrowers can view their own loans and add comments to payments.
@@ -232,3 +306,7 @@ but it is **not safe**: `end_date: null as never` in `loans/create.tsx` silenced
 `NOT NULL` violation (finding S4). Prefer regenerating the Supabase types over adding
 new casts, and when a cast is unavoidable, verify the value against the actual column
 constraint first.
+
+## Todo lo demás
+
+Stack, comandos, arquitectura, convenciones, principios de código, el flujo Spec-Anchored, README sync, y el workflow de Git — todo eso vive en **`AGENTS.md`** (importado arriba). Es el mismo archivo que va a leer cualquier otro agente (Codex, Cursor, OpenCode, Copilot) si en algún momento se usa uno distinto en este proyecto.

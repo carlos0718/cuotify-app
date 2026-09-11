@@ -217,6 +217,35 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 
 ---
 
+## 5.8 Schema de DB (resumen — ver `supabase/migrations/` para el detalle exacto)
+
+> Nota: R1 ya documenta que hay columnas en producción sin migración correspondiente — este resumen es de las tablas creadas por migración, no una garantía de que coincide 1:1 con la DB real.
+
+| Tabla | Migración | Rol |
+|---|---|---|
+| `profiles` | `001_initial_schema.sql` (+ trigger de `002_auto_create_profile.sql`) | Perfil de usuario (lender/borrower/both), 1:1 con `auth.users` |
+| `borrowers` | `001` | Contacto del prestamista — raíz del agregado Prestatario |
+| `loans` | `001`, ampliada en `003` (interest_type), `004` (mora), `005` (currency), `011` (open), `012` (rate) | Raíz del agregado Préstamo |
+| `payments` | `001` | Cuotas de un préstamo — generadas por trigger `after_loan_insert` |
+| `notifications` | `001` | Centro de notificaciones in-app |
+| `push_tokens` | `001` | Tokens de push por dispositivo |
+| `personal_debts` | `006` | Raíz del agregado Deuda personal |
+| `debt_payments` | `006` | Cuotas de una deuda personal — generadas por RPC `generate_debt_payment_schedule` |
+| `notification_preferences` | `008` | Preferencias de notificación por usuario |
+
+## 5.9 API Contracts (RPCs y Edge Functions — no hay API REST propia, todo es Supabase directo)
+
+| Contrato | Tipo | Definido en | Consumido por |
+|---|---|---|---|
+| `generate_debt_payment_schedule` | RPC (Postgres function) | `007_add_monthly_interest_rpc.sql` y siguientes | `personalDebts.ts` al crear una deuda |
+| `get_monthly_interest_earned` | RPC | `007_add_monthly_interest_rpc.sql` | Dashboard prestamista (§ 5.6, gráfico pendiente) |
+| `after_loan_insert` (trigger, no RPC invocable) | Trigger de DB | `001_initial_schema.sql` | Se dispara solo al insertar en `loans` |
+| `analyze-loans-document` | Edge Function (Deno) | `supabase/functions/analyze-loans-document/` | Importación de préstamos en lote con Gemini (§ 5.2) |
+| `analyze-credit-card` | Edge Function (Deno) | `supabase/functions/analyze-credit-card/` | Import de resumen de tarjeta con IA (§ 5.3) |
+| `send-payment-reminders` | Edge Function (Deno) | `supabase/functions/send-payment-reminders/` | Envío server-side de recordatorios (§ 5.5) — sin cron automático todavía |
+
+---
+
 ## 6. Requisitos no funcionales
 
 | Área | Estado | Notas |
@@ -284,3 +313,14 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - Cualquier forma de intermediación financiera regulada
 - Multi-usuario / equipos sobre la misma cartera de préstamos
 - Versión web (el bundler web está configurado pero no es un target soportado)
+
+---
+
+## 10. Historial de cambios
+
+> Este proyecto usa Finding IDs (`S*`/`L*`/`A*`/`U*`/`P*`, ver `AGENTS.md` § Trazabilidad de requisitos) en vez del esquema `RF-N`/`US-N` — las entradas de features nuevas referencian su ID de finding cuando corresponde.
+
+| Fecha | Cambio | Referencia |
+|---|---|---|
+| 2026-08-10 | Adopción del proyecto con `rocky-spec` (entonces `charlydev-flow`) — SPEC reconstruido desde el código existente | — |
+| 2026-09-11 | `.rocky-spec` actualizado a v0.20.0 — SPEC.md, AGENTS.md, CLAUDE.md, OBSERVABILITY.md, CHANGELOG.md y TODO.md alineados al template vigente (drift de contenido resuelto) | — |

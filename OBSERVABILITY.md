@@ -22,7 +22,7 @@ Cuotify es una app móvil (Expo/React Native) sin servidor propio — el único 
 | **Uptime monitoring** | No aplica directamente (no hay servidor propio) — la disponibilidad depende del status de Supabase; considerar suscribirse a status.supabase.com si se vuelve crítico |
 | **Métricas de negocio** | Dashboard nativo de la app (stats de prestamista/prestatario) — no hay métricas de producto (analytics de uso) configuradas |
 
-## Setup pendiente
+## Setup
 
 - [ ] Sentry (o equivalente) inicializado en el cliente — captura de crashes y errores no manejados (`TODO.md` § A5)
 - [ ] `ErrorBoundary` en los layouts raíz para que un crash de un screen no tire toda la app (`TODO.md` § A4)

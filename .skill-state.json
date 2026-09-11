@@ -19,5 +19,11 @@
     "changelog_generated": true,
     "license_decision": "proprietary"
   },
-  "last_drift_check": "2026-09-11T00:00:00.000Z"
+  "last_drift_check": "2026-09-11T00:00:00.000Z",
+  "content_drift_resolved": {
+    "date": "2026-09-11",
+    "rocky_version": "0.20.0",
+    "files_merged": ["SPEC.md", "AGENTS.md", "CLAUDE.md", "OBSERVABILITY.md", "CHANGELOG.md", "TODO.md"],
+    "remaining_findings": "17 restantes son falsos positivos estructurales (contenido ya cubierto bajo otro titulo) — ver nota en TODO.md § Documentacion"
+  }
 }

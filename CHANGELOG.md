@@ -11,6 +11,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 ### Added
 - `ErrorBoundary` en el layout raíz y en `(main)`, con fallback compartido y botón de reintentar — antes un error de render dejaba la app en blanco (A4)
 
+### Changed
+
+### Deprecated
+
+### Removed
+
 ### Fixed
 - Prestatario podía marcar sus propias cuotas como pagadas — cerrado con RLS (S1)
 - Cualquier usuario podía insertar notificaciones para otro usuario — cerrado con RLS (S2)
