@@ -184,7 +184,7 @@
 - [x] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
 - [x] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [x] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
-- [ ] **L16** `getNextLoanColor`/`getLoanColorByIndex` — mismatch de tipos contra la paleta literal
+- [x] **L16** `getNextLoanColor`/`getLoanColorByIndex` — mismatch de tipos contra la paleta literal
 - [x] **L18** Función usada en `useEffect` antes de declararse — 4 archivos (error de lint, bloqueaba CI)
 - [x] **L19** `Toast.tsx` leía refs (`useRef(...).current`) durante el render (error de lint, bloqueaba CI)
 - [x] **L20** Falso positivo de `react-hooks/set-state-in-effect` en `reset-password.tsx` — suprimido con comentario

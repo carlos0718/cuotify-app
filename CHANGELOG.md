@@ -29,6 +29,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 - `onAuthStateChange` tipaba la sesión como `unknown`, obligando a castear en `authStore.ts` sin garantía real — ahora usa el tipo `Session | null` de `@supabase/supabase-js` (L14)
 - CI en rojo por 10 errores de lint: funciones usadas en un `useEffect` antes de declararse en `reset-password.tsx`, `customer-center.tsx`, `premium.tsx` y `Toast.tsx` (L18); refs leídas durante el render en `Toast.tsx` (L19); falso positivo de `react-hooks/set-state-in-effect` en `reset-password.tsx`, suprimido con comentario (L20)
 - `Modal` con `style: 'secondary'` (no existe en el tipo del componente) en el botón "Cerrar" del calendario de `loans/create.tsx` — cambiado a `'cancel'`, el mismo estilo que usan todos los demás modales del proyecto para ese caso (L15)
+- `getNextLoanColor` comparaba un `string` genérico contra la tupla de literales de `colors.loanColors` (`as const`) — `tsc --noEmit` lo marcaba en `pastelColors.indexOf(lastColor)` (L16)
 
 ### Security
 - Dump y sincronización del schema real de Supabase con `supabase/migrations/`, que estaba desactualizado (S3)
