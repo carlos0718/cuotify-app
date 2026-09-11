@@ -1,3 +1,4 @@
+import { Session } from '@supabase/supabase-js';
 import { supabase, handleSupabaseError } from './client';
 import { UserRole } from '../../types';
 
@@ -148,7 +149,7 @@ export async function updatePassword(newPassword: string) {
 
 // Escuchar cambios en la sesión
 export function onAuthStateChange(
-  callback: (event: string, session: unknown) => void
+  callback: (event: string, session: Session | null) => void
 ) {
   return supabase.auth.onAuthStateChange(callback);
 }
