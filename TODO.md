@@ -14,10 +14,14 @@
 - [x] Design tokens en `src/theme/`
 - [x] EAS Build configurado (`eas.json`)
 - [x] RevenueCat integrado
-- [ ] ESLint + `typecheck` en scripts de npm — ver `IMPROVEMENTS.md` § A8
+- [x] ESLint + `typecheck` en scripts de npm — ver `IMPROVEMENTS.md` § A8
+      (`npx expo lint` configuró `eslint-config-expo`; `tsc --noEmit` excluye
+      `supabase/functions/` en `tsconfig.json` porque son Edge Functions Deno,
+      no código Node/Expo. Encontraron 62 problemas de lint y 6 errores de tipos
+      reales — quedan como tareas nuevas L14-L17 en el Bloque 3, L12 ya estaba)
 - [ ] Jest (`jest-expo`) configurado
 - [ ] CI en GitHub Actions (lint + typecheck + test)
-- [ ] Crear rama `dev` desde `master`, si se decide adoptar GitFlow completo (hoy se trabaja directo sobre `master` — ver `AGENTS.md` § "Branching — GitFlow simplificado")
+- [x] Crear rama `dev` desde `master` — GitFlow simplificado adoptado (ver `AGENTS.md` § "Branching — GitFlow simplificado")
 
 ## Dominio / DB
 
@@ -170,9 +174,12 @@
 # 🟠 Bloque 3 — Red de seguridad
 
 - [ ] **A3** Tests unitarios de `loanCalculator.ts` (simple, francés, mora, bordes)
-- [ ] **A8** ESLint + typecheck + CI
+- [x] **A8** ESLint + typecheck (`npx expo lint` + `tsc --noEmit`) — falta todavía el CI en GitHub Actions, ver `## Setup`
 - [ ] **L6** Unificar el cálculo duplicado TS / PL/pgSQL *(hacer con A3 ya listo)*
 - [ ] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
+- [ ] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
+- [ ] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
+- [ ] **L16** `getNextLoanColor`/`getLoanColorByIndex` — mismatch de tipos contra la paleta literal
 
 # 🟡 Deuda técnica (detectada al adoptar el proyecto)
 

@@ -398,6 +398,44 @@ advertencia no bloqueante. La verificación real la da el email de confirmación
 todos los campos), y `zodResolver`. Elimina ~150 líneas de validación duplicada y da
 tipos derivados del schema.
 
+### 🟡 L14 · `onAuthStateChange` tipa la sesión como `unknown`
+`src/services/supabase/auth.ts:150-153` expone el callback con
+`session: unknown`, y `authStore.ts:79` lee `session.user` sobre ese `unknown` sin
+castear primero — el proyecto viene del mismo problema que documenta el "Caveat on the
+`as never` pattern" de `AGENTS.md`/`CLAUDE.md`: tipos débiles en el borde de Supabase
+que se filtran al store de auth.
+
+**Fix:** tipar el callback como `(event: string, session: Session | null) => void`
+usando el tipo `Session` de `@supabase/supabase-js` — elimina el cast implícito y el
+error de `tsc --noEmit` en `authStore.ts:79`.
+
+### 🟡 L15 · `Modal` con `style: 'secondary'` que no existe en el tipo del componente
+`src/app/(main)/loans/create.tsx:634` pasa `style: 'secondary'` a un botón del
+`Modal`, pero `src/components/ui/Modal.tsx:7` solo acepta
+`'default' | 'cancel' | 'destructive' | 'primary'`. Hoy no rompe en runtime (React
+Native ignora el estilo desconocido y cae al default visual), pero es un typo que
+`tsc --noEmit` ya puede detectar.
+
+**Fix:** cambiar a `'default'` (o el estilo visual que corresponda) en el callsite —
+no ampliar el tipo del componente para acomodar un typo.
+
+### 🟡 L16 · `getNextLoanColor`/`getLoanColorByIndex` no aceptan `string` genérico contra la paleta tipada
+`src/utils/loanColors.ts:17` hace `pastelColors.indexOf(lastColor)` donde
+`pastelColors` es la tupla de los 10 hex literales de `colors.loanColors` y
+`lastColor` es `string` — TS exige que el argumento de `indexOf` sea del mismo tipo
+literal que los elementos del array.
+
+**Fix:** `(pastelColors as readonly string[]).indexOf(lastColor)`, o relajar el tipo
+de retorno de `colors.loanColors` a `string[]` si no hace falta la literalidad en
+otro lado.
+
+### 🟡 L17 · `.update()` sin tipar en `settings/profile.tsx` — síntoma de A7
+`src/app/(main)/settings/profile.tsx:36-41` llama `.update({ full_name, phone, dni })`
+sin `as never`, y falla contra los tipos generados de `database.types.ts` (parámetro
+inferido como `never`). Es el mismo síntoma que ya cubre **A7** (regenerar
+`database.types.ts` contra el schema real) — no se abre como finding aparte, se
+resuelve solo cuando se cierre A7.
+
 ---
 
 ## 3. Arquitectura y calidad de código
