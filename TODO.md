@@ -27,9 +27,12 @@
 - [x] Migraciones 003-007: interest_type, mora, moneda, deudas personales, RPC de intereses
 - [x] 🔴 **Dump del schema real y sincronizar `supabase/migrations/`** — § S3
 - [x] 🔴 Migración 011: soporte real de `interest_type: 'open'` (term_value / end_date nullable) — § S4
-- [ ] 🔴 Migración 009: cerrar la policy de UPDATE de prestatarios con column grants — § S1
+- [x] 🔴 Migración 009: cerrar el UPDATE de prestatarios en `payments` — § S1
+      (no con column grants — prestamista y prestatario comparten el rol `authenticated`;
+      se resolvió con un trigger `BEFORE UPDATE` que solo permite editar
+      `borrower_comment`/`borrower_comment_date` cuando quien edita no es el lender)
 - [x] 🔴 Migración 010: cerrar el INSERT abierto de notificaciones — § S2
-- [ ] 🔴 Migración 011: `interest_rate` a `DECIMAL(8,2)` — § L3
+- [x] 🔴 Migración 012: `interest_rate` a `DECIMAL(8,2)` — § L3
 - [ ] Regenerar `database.types.ts` contra el schema real — § A7
 - [ ] Cron (`pg_cron`) que recalcule mora diariamente — § L7
 - [ ] RPC transaccional `mark_payment_paid` / `revert_payment` — § L8
