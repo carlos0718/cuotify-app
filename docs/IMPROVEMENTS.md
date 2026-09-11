@@ -429,6 +429,17 @@ literal que los elementos del array.
 de retorno de `colors.loanColors` a `string[]` si no hace falta la literalidad en
 otro lado.
 
+### 🟡 L18 · `validateSession` se usa en un `useEffect` antes de declararse
+`src/app/(auth)/reset-password.tsx:28-32` llama `validateSession()` dentro de un
+`useEffect` en la línea 29, pero la función se declara como `const` recién en la
+línea 32. Funciona en runtime (React corre los efectos después del render, cuando la
+función ya está asignada), pero `eslint-config-expo` (regla `react-hooks/immutability`)
+lo marca como **error** — es de los 11 errores que hoy bloquean `npm run lint`.
+
+**Fix:** mover la declaración de `validateSession` antes del `useEffect` que la usa
+(o envolverla en `useCallback` y ajustar el orden). Mismo patrón menor, como warning
+en vez de error, en `src/components/ui/Toast.tsx` con `hideToast`.
+
 ### 🟡 L17 · `.update()` sin tipar en `settings/profile.tsx` — síntoma de A7
 `src/app/(main)/settings/profile.tsx:36-41` llama `.update({ full_name, phone, dni })`
 sin `as never`, y falla contra los tipos generados de `database.types.ts` (parámetro

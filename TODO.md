@@ -19,8 +19,13 @@
       `supabase/functions/` en `tsconfig.json` porque son Edge Functions Deno,
       no código Node/Expo. Encontraron 62 problemas de lint y 6 errores de tipos
       reales — quedan como tareas nuevas L14-L17 en el Bloque 3, L12 ya estaba)
-- [ ] Jest (`jest-expo`) configurado
-- [ ] CI en GitHub Actions (lint + typecheck + test)
+- [x] Jest (`jest-expo`) configurado — preset en `package.json`, primer smoke test en
+      `src/services/calculations/__tests__/loanCalculator.test.ts`. `@react-native/jest-preset`
+      quedó pineado a `0.86.3` (exacto, no caret) para que coincida con la versión real de
+      `react-native` — `expo install` resolvió `^0.87.1` y rompía el preset
+- [x] CI en GitHub Actions (lint + typecheck + test) — `.github/workflows/ci.yml`, corre en
+      push/PR a `master`/`development`. El primer run va a salir en 🔴 por la deuda ya
+      conocida (L12, L14-L18) — es esperado, no un problema de la config del workflow
 - [x] Crear rama `development` desde `master` — GitFlow simplificado adoptado (ver `AGENTS.md` § "Branching — GitFlow simplificado")
 
 ## Dominio / DB
@@ -180,6 +185,7 @@
 - [ ] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [ ] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
 - [ ] **L16** `getNextLoanColor`/`getLoanColorByIndex` — mismatch de tipos contra la paleta literal
+- [ ] **L18** `validateSession` usada en `useEffect` antes de declararse en `reset-password.tsx` (error de lint, bloquea CI)
 
 # 🟡 Deuda técnica (detectada al adoptar el proyecto)
 
