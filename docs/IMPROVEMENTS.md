@@ -429,16 +429,44 @@ literal que los elementos del array.
 de retorno de `colors.loanColors` a `string[]` si no hace falta la literalidad en
 otro lado.
 
-### 🟡 L18 · `validateSession` se usa en un `useEffect` antes de declararse
-`src/app/(auth)/reset-password.tsx:28-32` llama `validateSession()` dentro de un
-`useEffect` en la línea 29, pero la función se declara como `const` recién en la
-línea 32. Funciona en runtime (React corre los efectos después del render, cuando la
-función ya está asignada), pero `eslint-config-expo` (regla `react-hooks/immutability`)
-lo marca como **error** — es de los 11 errores que hoy bloquean `npm run lint`.
+### ✅ L18 · Función usada en un `useEffect` antes de declararse — Resuelto
+El mismo patrón aparecía en **4 archivos**, no solo en el que se detectó primero:
+`src/app/(auth)/reset-password.tsx:28-32` (`validateSession`),
+`src/app/(main)/settings/customer-center.tsx:19-23` (`openCustomerCenter`),
+`src/app/(main)/settings/premium.tsx:63-69` (`presentNativePaywall`) y
+`src/components/ui/Toast.tsx:53-71` (`hideToast`). Todos funcionan en runtime
+(React corre los efectos después del render, cuando la función ya está asignada),
+pero `eslint-config-expo` (regla `react-hooks/immutability`) los marca como
+**error** — eran 4 de los 10 errores que bloqueaban `npm run lint` / el CI.
 
-**Fix:** mover la declaración de `validateSession` antes del `useEffect` que la usa
-(o envolverla en `useCallback` y ajustar el orden). Mismo patrón menor, como warning
-en vez de error, en `src/components/ui/Toast.tsx` con `hideToast`.
+**Fix aplicado:** mover la declaración de la función antes del `useEffect` que la
+usa, en los 4 archivos. Sin cambio de comportamiento, solo de orden.
+
+### ✅ L19 · `Toast.tsx` leía refs (`useRef(...).current`) durante el render — Resuelto
+`src/components/ui/Toast.tsx:50-51` guardaba los `Animated.Value` de la animación
+con `useRef(new Animated.Value(...)).current` y los leía directamente en el JSX
+(`style={[..., { transform: [{ translateY }], opacity }]}`). La regla nueva
+`react-hooks/refs` (parte del set de reglas de React Compiler en
+`eslint-plugin-react-hooks`) prohíbe leer un ref durante el render — apareció como
+6 de los 10 errores de lint (3 por cada valor, una vez por cada punto de lectura).
+
+**Fix aplicado:** reemplazar `useRef(...).current` por
+`useState(() => new Animated.Value(...))[0]` — mismo patrón de valor estable que
+nunca dispara un re-render (no se llama al setter), pero ya no es un "ref" para
+el linter.
+
+### ✅ L20 · Falso positivo de `react-hooks/set-state-in-effect` en `reset-password.tsx` — Resuelto (suprimido)
+Al resolver L18 en `reset-password.tsx`, el linter pudo completar el análisis de
+ese `useEffect` y encontró una regla más: `react-hooks/set-state-in-effect` marcó
+la llamada a `validateSession()` porque esa función termina llamando
+`setIsValidSession`/`setIsValidating`. En los hechos esos `setState` corren en un
+microtask después de un `await`, no de forma síncrona durante el commit del
+efecto — es un patrón estándar (validar sesión al montar) y no dispara el problema
+real que la regla busca evitar (cascading renders síncronos).
+
+**Fix aplicado:** `// eslint-disable-next-line react-hooks/set-state-in-effect`
+con un comentario explicando el porqué, siguiendo la misma convención que ya usan
+`loans.ts:877` y `personalDebts.ts:117` para otras reglas.
 
 ### 🟡 L17 · `.update()` sin tipar en `settings/profile.tsx` — síntoma de A7
 `src/app/(main)/settings/profile.tsx:36-41` llama `.update({ full_name, phone, dni })`
