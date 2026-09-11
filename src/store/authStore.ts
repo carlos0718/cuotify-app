@@ -204,6 +204,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   getRole: () => {
     const state = get();
-    return state.profile?.role || null;
+    return (state.profile?.role as UserRole | null) || null;
   },
 }));

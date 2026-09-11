@@ -29,7 +29,7 @@ export async function saveNotificationPreferences(
         reminder_days_before: prefs.reminder_days_before,
         push_enabled: prefs.push_enabled,
         updated_at: new Date().toISOString(),
-      } as never,
+      },
       { onConflict: 'user_id' }
     );
 

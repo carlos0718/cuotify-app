@@ -468,15 +468,23 @@ efecto — es un patrón estándar (validar sesión al montar) y no dispara el p
 real que la regla busca evitar (cascading renders síncronos).
 
 **Fix aplicado:** `// eslint-disable-next-line react-hooks/set-state-in-effect`
-con un comentario explicando el porqué, siguiendo la misma convención que ya usan
-`loans.ts:877` y `personalDebts.ts:117` para otras reglas.
+con un comentario explicando el porqué, siguiendo la misma convención que usaba
+el repo para otras reglas (ver A7 — esos otros `eslint-disable` puntuales de
+`@typescript-eslint/no-explicit-any` ya no existen, se sacaron al regenerar los
+tipos).
 
-### 🟡 L17 · `.update()` sin tipar en `settings/profile.tsx` — síntoma de A7
-`src/app/(main)/settings/profile.tsx:36-41` llama `.update({ full_name, phone, dni })`
-sin `as never`, y falla contra los tipos generados de `database.types.ts` (parámetro
-inferido como `never`). Es el mismo síntoma que ya cubre **A7** (regenerar
-`database.types.ts` contra el schema real) — no se abre como finding aparte, se
-resuelve solo cuando se cierre A7.
+### ✅ L17 · `.update()` sin tipar en `settings/profile.tsx` — Resuelto (síntoma de A7)
+`src/app/(main)/settings/profile.tsx:36-41` llamaba `.update({ full_name, phone, dni })`
+sin `as never`, y fallaba contra los tipos generados de `database.types.ts`
+(parámetro inferido como `never`) porque el archivo de tipos estaba desactualizado.
+Era el mismo síntoma que cubre **A7** (regenerar `database.types.ts` contra el
+schema real) — no se abrió como finding aparte, se resolvió al cerrar A7.
+
+Al regenerar los tipos también apareció un segundo error real en el mismo archivo:
+`.eq('id', profile?.id)` pasaba `string | undefined` a una columna `id: string`
+(el `id` ya no era opcional en los tipos reales). Se agregó un `if (!profile) return;`
+al principio de `handleSave` — no hacía falta el optional chaining para algo que
+la pantalla ya asume que existe.
 
 ---
 
@@ -567,14 +575,41 @@ los `export` nombrados de arriba (que son los que el código realmente usa).
 **Fix:** importar arriba y componer el objeto con las referencias ya importadas — o
 eliminar el objeto `theme`, dado que ningún archivo lo consume.
 
-### 🟡 A7 · 22 casos de `as any` / `as never`
-El `as never` en los inserts está documentado en `CLAUDE.md` como patrón aceptado, y es
-un workaround conocido de los tipos generados de Supabase. Pero ya causó un bug real
-(**S4**: `end_date: null as never` silenció una violación de `NOT NULL`).
+### ✅ A7 · 22 casos de `as any` / `as never` — Resuelto
+`database.types.ts` estaba escrito a mano y desactualizado: le faltaban por completo
+las tablas `personal_debts`, `debt_payments` y `notification_preferences` (existían
+en producción desde antes de S3, pero nunca se agregaron a los tipos), y los campos
+`status`/`interest_type`/`currency`/etc. estaban tipados como unions literales que
+no correspondían a columnas `TEXT` con `CHECK` (el generador real las tipa como
+`string`). Sin esas tablas en `Database`, cualquier `.from('personal_debts')` /
+`.from('notification_preferences')` quedaba sin tipo real, forzando `as never` en
+cada insert/update — exactamente el mecanismo que causó **S4**
+(`end_date: null as never` silenció una violación de `NOT NULL`).
 
-**Fix:** regenerar los tipos contra el schema real (`supabase gen types typescript`)
-después de resolver S3. Con tipos correctos, la mayoría de los `as never` desaparecen y
-los que queden marcan problemas reales.
+**Fix aplicado:**
+1. `npx supabase gen types typescript --linked` contra el proyecto real (bloqueado al
+   principio por el proyecto pausado — Supabase pausa automáticamente los proyectos
+   free sin actividad; se reactivó desde el dashboard y generó sin problema).
+2. Se preservó la sección de "tipos auxiliares" (`Profile`, `Borrower`, `Loan`,
+   `Payment`, `*Insert`, `*Update`, `NotificationPreferences`) al final del archivo,
+   ahora derivada del `Database` real.
+3. Con tipos correctos, se sacaron **27** `as never`/`as any` que ya no hacían falta:
+   14 en `loans.ts` (incluida la llamada RPC `get_monthly_interest_earned`, que ya
+   estaba en el schema tipado), 8 en `personalDebts.ts` (incluida la RPC
+   `generate_debt_payment_schedule`), 1 en `notificationPreferences.ts`, 3 en
+   `loans/analyze.tsx` y 1 en `loans.ts` (`(data as any).lender_id`, reemplazado por
+   `loan.lender_id` ya tipado).
+4. Quedan **3** `as never`/`as any` sin tocar en `loans/index.tsx` y
+   `notifications/index.tsx` — son casts de rutas dinámicas de Expo Router
+   (`router.push(path as never)`), un problema de tipado de rutas ajeno a
+   `database.types.ts`, no a Supabase.
+5. Dos errores reales que quedaban ocultos por el `as never` de `profile.tsx`
+   aparecieron y se resolvieron ahí mismo (ver **L17**) y en `authStore.ts`/
+   `settings/index.tsx` (`profile.role` pasó a tipar `string | null` genérico —
+   se castea a `UserRole` en los 2 puntos donde se compara, verificado contra el
+   `CHECK` real de la columna en `001_initial_schema.sql:15`).
+
+`npx tsc --noEmit` y `npx expo lint` en 0 errores tras el cambio.
 
 ### 🟡 A8 · Sin ESLint ni type-check en CI
 No hay `lint` ni `typecheck` en los scripts de `package.json`, y no hay workflow de CI.

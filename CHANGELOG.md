@@ -30,6 +30,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 - CI en rojo por 10 errores de lint: funciones usadas en un `useEffect` antes de declararse en `reset-password.tsx`, `customer-center.tsx`, `premium.tsx` y `Toast.tsx` (L18); refs leídas durante el render en `Toast.tsx` (L19); falso positivo de `react-hooks/set-state-in-effect` en `reset-password.tsx`, suprimido con comentario (L20)
 - `Modal` con `style: 'secondary'` (no existe en el tipo del componente) en el botón "Cerrar" del calendario de `loans/create.tsx` — cambiado a `'cancel'`, el mismo estilo que usan todos los demás modales del proyecto para ese caso (L15)
 - `getNextLoanColor` comparaba un `string` genérico contra la tupla de literales de `colors.loanColors` (`as const`) — `tsc --noEmit` lo marcaba en `pastelColors.indexOf(lastColor)` (L16)
+- `database.types.ts` estaba desactualizado a mano: le faltaban las tablas `personal_debts`, `debt_payments` y `notification_preferences` — regenerado contra el schema real, lo que sacó 27 `as never`/`as any` que ya no hacían falta en `loans.ts`, `personalDebts.ts`, `notificationPreferences.ts` y `loans/analyze.tsx` (A7)
+- `.update()` en `settings/profile.tsx` fallaba contra los tipos regenerados (`profile?.id` como `string | undefined`) — se agregó un guard `if (!profile) return` (L17)
 
 ### Security
 - Dump y sincronización del schema real de Supabase con `supabase/migrations/`, que estaba desactualizado (S3)

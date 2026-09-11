@@ -105,7 +105,7 @@ export async function createPersonalDebt(input: CreatePersonalDebtInput): Promis
       total_amount,
       installment_amount,
       delivery_date: input.delivery_date || new Date().toISOString().split('T')[0],
-    } as never)
+    })
     .select()
     .single();
 
@@ -114,8 +114,7 @@ export async function createPersonalDebt(input: CreatePersonalDebtInput): Promis
   const debt = debtRaw as PersonalDebt;
 
   // 4. Generar cronograma de pagos
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: scheduleError } = await (supabase as any).rpc('generate_debt_payment_schedule', {
+  const { error: scheduleError } = await supabase.rpc('generate_debt_payment_schedule', {
     p_debt_id: debt.id,
     p_principal: principal_amount,
     p_interest_rate: interest_rate,
@@ -144,7 +143,7 @@ export async function getPersonalDebts(): Promise<PersonalDebt[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(handleSupabaseError(error));
-  return data || [];
+  return (data || []) as PersonalDebt[];
 }
 
 /**
@@ -158,7 +157,7 @@ export async function getActivePersonalDebts(): Promise<PersonalDebt[]> {
     .order('first_payment_date', { ascending: true });
 
   if (error) throw new Error(handleSupabaseError(error));
-  return data || [];
+  return (data || []) as PersonalDebt[];
 }
 
 /**
@@ -184,7 +183,7 @@ export async function updateDebtStatus(
 ): Promise<PersonalDebt> {
   const { data, error } = await supabase
     .from('personal_debts')
-    .update({ status } as never)
+    .update({ status })
     .eq('id', id)
     .select()
     .single();
@@ -215,7 +214,7 @@ export async function deletePersonalDebt(id: string): Promise<void> {
 export async function updateDebtColor(id: string, color_code: string): Promise<void> {
   const { error } = await supabase
     .from('personal_debts')
-    .update({ color_code } as never)
+    .update({ color_code })
     .eq('id', id);
 
   if (error) throw new Error(handleSupabaseError(error));
@@ -236,7 +235,7 @@ export async function getDebtPayments(debtId: string): Promise<DebtPayment[]> {
     .order('payment_number', { ascending: true });
 
   if (error) throw new Error(handleSupabaseError(error));
-  return data || [];
+  return (data || []) as DebtPayment[];
 }
 
 /**
@@ -254,7 +253,7 @@ export async function markDebtPaymentAsPaid(
       paid_date: new Date().toISOString().split('T')[0],
       paid_amount: paidAmount,
       notes,
-    } as never)
+    })
     .eq('id', paymentId)
     .select()
     .single();
@@ -274,7 +273,7 @@ export async function revertDebtPaymentToPending(paymentId: string): Promise<Deb
       paid_date: null,
       paid_amount: null,
       notes: null,
-    } as never)
+    })
     .eq('id', paymentId)
     .select()
     .single();
@@ -303,7 +302,7 @@ export async function getUpcomingDebtPayments(days: number = 7): Promise<DebtPay
     .order('due_date', { ascending: true });
 
   if (error) throw new Error(handleSupabaseError(error));
-  return data || [];
+  return (data || []) as DebtPayment[];
 }
 
 /**
@@ -326,14 +325,14 @@ export async function getOverdueDebtPayments(): Promise<DebtPayment[]> {
 
   // Actualizar estado a 'overdue'
   if (data && data.length > 0) {
-    const overdueIds = data.map((p: DebtPayment) => p.id);
+    const overdueIds = data.map((p) => p.id);
     await supabase
       .from('debt_payments')
-      .update({ status: 'overdue' } as never)
+      .update({ status: 'overdue' })
       .in('id', overdueIds);
   }
 
-  return data || [];
+  return (data || []) as DebtPayment[];
 }
 
 /**
@@ -344,7 +343,7 @@ export async function getDebtPaidAmounts(): Promise<Record<string, number>> {
   const { data, error } = await supabase
     .from('debt_payments')
     .select('debt_id, paid_amount')
-    .eq('status', 'paid' as never);
+    .eq('status', 'paid');
 
   if (error) throw new Error(handleSupabaseError(error));
 

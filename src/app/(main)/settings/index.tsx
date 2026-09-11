@@ -6,7 +6,7 @@ import { useAuthStore, usePreferencesStore, useSubscriptionStore } from '../../.
 import { Modal, useToast } from '../../../components';
 import { updateAllLoanColors } from '../../../services/supabase';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
-import { CurrencyType } from '../../../types';
+import { CurrencyType, UserRole } from '../../../types';
 
 // Información de contacto de soporte
 const SUPPORT_EMAIL = 'soporte@cuotify.app';
@@ -131,7 +131,7 @@ export default function SettingsScreen() {
             <Text style={styles.profileEmail}>{profile?.email}</Text>
             <View style={styles.roleBadge}>
               <Text style={styles.roleText}>
-                {roleLabel[profile?.role || 'borrower']}
+                {roleLabel[(profile?.role as UserRole) || 'borrower']}
               </Text>
             </View>
           </View>
