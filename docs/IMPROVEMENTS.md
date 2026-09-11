@@ -421,15 +421,16 @@ modal sin acción, el mismo caso que usa `style: 'cancel'` en todos los demás
 modales del proyecto (`loans/[id].tsx`, `debts/[id].tsx`, `settings/index.tsx`,
 etc.). No se amplió el tipo del componente para acomodar el typo.
 
-### 🟡 L16 · `getNextLoanColor`/`getLoanColorByIndex` no aceptan `string` genérico contra la paleta tipada
-`src/utils/loanColors.ts:17` hace `pastelColors.indexOf(lastColor)` donde
-`pastelColors` es la tupla de los 10 hex literales de `colors.loanColors` y
-`lastColor` es `string` — TS exige que el argumento de `indexOf` sea del mismo tipo
-literal que los elementos del array.
+### ✅ L16 · `getNextLoanColor` no aceptaba `string` genérico contra la paleta tipada — Resuelto
+`src/utils/loanColors.ts:17` hacía `pastelColors.indexOf(lastColor)` donde
+`pastelColors` es la tupla de los 10 hex literales de `colors.loanColors`
+(`as const`) y `lastColor` es `string` (viene de la DB) — TS exige que el
+argumento de `indexOf` sea del mismo tipo literal que los elementos del array.
 
-**Fix:** `(pastelColors as readonly string[]).indexOf(lastColor)`, o relajar el tipo
-de retorno de `colors.loanColors` a `string[]` si no hace falta la literalidad en
-otro lado.
+**Fix aplicado:** `(pastelColors as readonly string[]).indexOf(lastColor)` —
+se mantiene la literalidad de `colors.loanColors` (no hace falta relajarla en
+otro lado) y se castea puntualmente en el único callsite que compara contra un
+`string` genérico.
 
 ### ✅ L18 · Función usada en un `useEffect` antes de declararse — Resuelto
 El mismo patrón aparecía en **4 archivos**, no solo en el que se detectó primero:
