@@ -136,13 +136,13 @@ export async function savePushToken(userId: string, token: string): Promise<bool
       // Actualizar el token existente como activo
       await supabase
         .from('push_tokens')
-        .update({ is_active: true, updated_at: new Date().toISOString() } as never)
+        .update({ is_active: true, updated_at: new Date().toISOString() })
         .eq('id', existingRecord.id);
     } else {
       // Desactivar tokens anteriores del usuario
       await supabase
         .from('push_tokens')
-        .update({ is_active: false } as never)
+        .update({ is_active: false })
         .eq('user_id', userId);
 
       // Insertar nuevo token
@@ -153,7 +153,7 @@ export async function savePushToken(userId: string, token: string): Promise<bool
           token,
           device_type: deviceType,
           is_active: true,
-        } as never);
+        });
     }
 
     console.log('Push token guardado en Supabase');

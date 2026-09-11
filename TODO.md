@@ -43,7 +43,7 @@
       `borrower_comment`/`borrower_comment_date` cuando quien edita no es el lender)
 - [x] 🔴 Migración 010: cerrar el INSERT abierto de notificaciones — § S2
 - [x] 🔴 Migración 012: `interest_rate` a `DECIMAL(8,2)` — § L3
-- [ ] Regenerar `database.types.ts` contra el schema real — § A7
+- [x] Regenerar `database.types.ts` contra el schema real — § A7
 - [ ] Cron (`pg_cron`) que recalcule mora diariamente — § L7
 - [ ] RPC transaccional `mark_payment_paid` / `revert_payment` — § L8
 
@@ -185,6 +185,8 @@
 - [x] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [x] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
 - [x] **L16** `getNextLoanColor`/`getLoanColorByIndex` — mismatch de tipos contra la paleta literal
+- [x] **A7** Regenerar `database.types.ts` contra el schema real, sacar los `as never`/`as any` que ya no hacían falta (27 en 5 archivos)
+- [x] **L17** `.update()` sin tipar en `settings/profile.tsx` — resuelto junto con A7
 - [x] **L18** Función usada en `useEffect` antes de declararse — 4 archivos (error de lint, bloqueaba CI)
 - [x] **L19** `Toast.tsx` leía refs (`useRef(...).current`) durante el render (error de lint, bloqueaba CI)
 - [x] **L20** Falso positivo de `react-hooks/set-state-in-effect` en `reset-password.tsx` — suprimido con comentario

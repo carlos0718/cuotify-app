@@ -276,7 +276,7 @@ export default function AnalyzeLoansScreen() {
           dni: item.editedDni || null,
           phone: item.editedPhone || null,
           notes: item.editedNotes || null,
-        } as never);
+        });
 
         // 2. Calcular montos del préstamo
         const payment = calculateLoanPayment({
@@ -312,13 +312,13 @@ export default function AnalyzeLoansScreen() {
           total_amount: payment.totalAmount,
           delivery_date: deliveryDate,
           first_payment_date: firstPaymentDate.toISOString().split('T')[0],
-          end_date: endDate ? endDate.toISOString().split('T')[0] : (null as never),
+          end_date: endDate ? endDate.toISOString().split('T')[0] : null,
           late_penalty_type: 'none',
           late_penalty_rate: 0,
           grace_period_days: 0,
           notes: item.editedNotes || null,
           color_code: getLoanColorByIndex(colorIndex++),
-        } as never);
+        });
 
         successCount++;
       } catch (err) {

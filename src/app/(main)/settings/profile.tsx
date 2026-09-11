@@ -28,6 +28,8 @@ export default function ProfileScreen() {
       return;
     }
 
+    if (!profile) return;
+
     setIsLoading(true);
 
     try {
@@ -38,7 +40,7 @@ export default function ProfileScreen() {
           phone: phone.trim() || null,
           dni: dni.trim() || null,
         })
-        .eq('id', profile?.id);
+        .eq('id', profile.id);
 
       if (error) throw error;
 
