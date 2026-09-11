@@ -21,7 +21,7 @@
       reales — quedan como tareas nuevas L14-L17 en el Bloque 3, L12 ya estaba)
 - [ ] Jest (`jest-expo`) configurado
 - [ ] CI en GitHub Actions (lint + typecheck + test)
-- [x] Crear rama `dev` desde `master` — GitFlow simplificado adoptado (ver `AGENTS.md` § "Branching — GitFlow simplificado")
+- [x] Crear rama `development` desde `master` — GitFlow simplificado adoptado (ver `AGENTS.md` § "Branching — GitFlow simplificado")
 
 ## Dominio / DB
 

@@ -141,7 +141,7 @@ Each loan gets a pastel `color_code` from the `colors.loanColors` palette (`src/
 
 - **Naming**: archivos de pantalla en `camelCase`/`kebab-case` según convención de Expo Router (`[id].tsx` para rutas dinámicas); componentes y stores en `PascalCase`/`camelCase` respectivamente (`useAuthStore`, `LoanCard`).
 - **Commits**: Conventional Commits, subject en español, referenciando el ID del finding cuando aplica (ver "Workflow de Git" más abajo).
-- **Branches**: GitFlow simplificado — `master` (producción) / `dev` (integración) / `feature/*` / `fix/*` — ver "Branching — GitFlow simplificado" más abajo.
+- **Branches**: GitFlow simplificado — `master` (producción) / `development` (integración) / `feature/*` / `fix/*` — ver "Branching — GitFlow simplificado" más abajo.
 
 ## Code style — boundaries
 
@@ -356,7 +356,7 @@ Cada ítem del `TODO.md` representa una tarea o finding. Al completar uno:
 
 0. **Spec Drift Check** (ver detalle abajo): ¿el código que estoy por commitear agrega algo que no está en `SPEC.md`? Si sí, actualizar `SPEC.md` primero.
 0-bis. **TODO Size Check** (ver detalle abajo): ¿`TODO.md` se acerca al límite de tamaño?
-0-ter. **Branch Discipline Check**: ¿la rama actual es `master` o `dev`? Si sí y el cambio no es trivial, avisar antes de commitear — se espera trabajar en `feature/<nombre>`/`fix/<nombre>`, no directo sobre las ramas principales (ver "Branching" abajo).
+0-ter. **Branch Discipline Check**: ¿la rama actual es `master` o `development`? Si sí y el cambio no es trivial, avisar antes de commitear — se espera trabajar en `feature/<nombre>`/`fix/<nombre>`, no directo sobre las ramas principales (ver "Branching" abajo).
 1. Marcar el checkbox en `TODO.md`: `- [ ]` → `- [x]`.
 1-bis. Actualizar `CHANGELOG.md` si el tipo es `feat`, `fix`, o breaking change: agregar una línea bajo `[Unreleased]`.
 2. `git add` de los archivos de código + `TODO.md` + `CHANGELOG.md` si se tocó, todo junto.
@@ -400,16 +400,16 @@ wc -l TODO.md
 
 ## Branching — GitFlow simplificado
 
-**Regla:** `master` es siempre estable (equivalente a `main` del template). `dev` es la rama de integración — el trabajo del día a día no se hace directo sobre `master` ni sobre `dev`, sino en una rama propia por feature o corrección.
+**Regla:** `master` es siempre estable (equivalente a `main` del template). `development` es la rama de integración — el trabajo del día a día no se hace directo sobre `master` ni sobre `development`, sino en una rama propia por feature o corrección.
 
 - `master` → producción, siempre en estado deployable.
-- `dev` → integración. Creada desde `master` (ver `TODO.md` § Setup).
-- `feature/<nombre-corto>` → una feature nueva. Sale de `dev`, vuelve a `dev`.
-- `fix/<nombre-corto>` → una corrección (ej. `fix/bloque-1-datos-y-moneda`, previa a la adopción de `dev`). Sale de `dev` (o de `master` si es un hotfix urgente), vuelve a la misma rama de la que salió.
+- `development` → integración. Creada desde `master` (ver `TODO.md` § Setup).
+- `feature/<nombre-corto>` → una feature nueva. Sale de `development`, vuelve a `development`.
+- `fix/<nombre-corto>` → una corrección (ej. `fix/bloque-1-datos-y-moneda`, previa a la adopción de `development`). Sale de `development` (o de `master` si es un hotfix urgente), vuelve a la misma rama de la que salió.
 
 ```bash
 # Al empezar a trabajar en algo nuevo
-git checkout dev
+git checkout development
 git pull
 git checkout -b feature/nombre-corto    # o fix/nombre-corto
 ```
