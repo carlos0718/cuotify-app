@@ -20,7 +20,9 @@
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://iqiclocyjemrynksiycg.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxaWNsb2N5amVtcnlua3NpeWNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2MzU4MDQsImV4cCI6MjA4NTIxMTgwNH0.807wQFPIPfPovAn9YkUz-Azn2JDkecF-nMUEq-DVJ0o"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxaWNsb2N5amVtcnlua3NpeWNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2MzU4MDQsImV4cCI6MjA4NTIxMTgwNH0.807wQFPIPfPovAn9YkUz-Azn2JDkecF-nMUEq-DVJ0o",
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "test_JchOkvEzlhSdWAJnCRZjXxRBAkU",
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "test_JchOkvEzlhSdWAJnCRZjXxRBAkU"
       }
     },
     "preview-apk": {

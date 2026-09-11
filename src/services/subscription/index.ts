@@ -7,11 +7,17 @@ import Purchases, {
 } from 'react-native-purchases';
 import { Platform } from 'react-native';
 
-// API key de RevenueCat (test key — reemplazar con producción al publicar)
+// API key de RevenueCat — una por plataforma, configuradas en .env
 const REVENUECAT_API_KEY = Platform.select({
-  ios: 'test_JchOkvEzlhSdWAJnCRZjXxRBAkU',
-  android: 'test_JchOkvEzlhSdWAJnCRZjXxRBAkU',
-}) ?? 'test_JchOkvEzlhSdWAJnCRZjXxRBAkU';
+  ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY,
+  android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
+}) ?? '';
+
+if (!REVENUECAT_API_KEY) {
+  console.warn(
+    'RevenueCat API key no configurada. Configura EXPO_PUBLIC_REVENUECAT_IOS_KEY / EXPO_PUBLIC_REVENUECAT_ANDROID_KEY'
+  );
+}
 
 // El entitlement configurado en el dashboard de RevenueCat
 export const ENTITLEMENT_ID = 'Cuotify Pro';

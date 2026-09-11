@@ -136,7 +136,7 @@
 - [ ] **S8** Eliminación de cuenta + política de privacidad
 - [x] **A4** `ErrorBoundary` en los layouts raíz
 - [ ] **A5** Sentry para crash reporting
-- [ ] **S5** Keys de RevenueCat fuera del código
+- [x] **S5** Keys de RevenueCat fuera del código
 - [ ] **A9** Unificar versión entre `package.json` y `app.json`
 - [ ] `assets/icon.png` no es cuadrado (1874×1761) — `expo-doctor` lo marca.
       Apple exige 1024×1024 exacto y sin canal alfa. Bloquea el submit, no el build.
