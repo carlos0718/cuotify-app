@@ -26,7 +26,7 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const { signUp, isLoading, clearError } = useAuthStore();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError, showWarning } = useToast();
 
   const handleRegister = async () => {
     if (!fullName.trim() || !email.trim() || !password || !confirmPassword) {
@@ -38,6 +38,9 @@ export default function RegisterScreen() {
     if (!emailValidation.isValid) {
       showError('Correo inválido', emailValidation.error || 'El correo no es válido');
       return;
+    }
+    if (emailValidation.warning) {
+      showWarning('Revisá tu correo', emailValidation.warning);
     }
 
     const dniValidation = validateDNI(dni);

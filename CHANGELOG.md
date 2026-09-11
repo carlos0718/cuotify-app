@@ -25,6 +25,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 - `formatCurrency` no pasaba la moneda real en `loans/[id].tsx` y `calendar/index.tsx`, mostraba préstamos en USD como si fueran ARS (L1)
 - Stats de prestamista/prestatario mezclaban montos de distintas monedas — separadas por moneda en dashboard, préstamos y deudas (L2)
 - Faltaba filtro por `lender_id` en `getActiveLoans`, `getUpcomingPayments` y `getOverduePayments` (L4)
+- `validateEmail` rechazaba dominios válidos no listados (`.tech`, `.ai`, etc.) por una allowlist cerrada de TLDs, y tenía una clave duplicada sin efecto en `COMMON_TLD_TYPOS` — ahora los TLDs desconocidos solo generan una advertencia no bloqueante (L12)
 
 ### Security
 - Dump y sincronización del schema real de Supabase con `supabase/migrations/`, que estaba desactualizado (S3)

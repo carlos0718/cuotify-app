@@ -181,7 +181,7 @@
 - [ ] **A3** Tests unitarios de `loanCalculator.ts` (simple, francés, mora, bordes)
 - [x] **A8** ESLint + typecheck (`npx expo lint` + `tsc --noEmit`) — falta todavía el CI en GitHub Actions, ver `## Setup`
 - [ ] **L6** Unificar el cálculo duplicado TS / PL/pgSQL *(hacer con A3 ya listo)*
-- [ ] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
+- [x] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
 - [ ] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [ ] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
 - [ ] **L16** `getNextLoanColor`/`getLoanColorByIndex` — mismatch de tipos contra la paleta literal
