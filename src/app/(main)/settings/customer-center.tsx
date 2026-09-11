@@ -16,10 +16,6 @@ import { colors } from '../../../theme';
  * Se accede desde Settings → Mi Plan (solo si el usuario es premium)
  */
 export default function CustomerCenterScreen() {
-  useEffect(() => {
-    openCustomerCenter();
-  }, []);
-
   const openCustomerCenter = async () => {
     try {
       await RevenueCatUI.presentCustomerCenter();
@@ -27,6 +23,10 @@ export default function CustomerCenterScreen() {
       router.back();
     }
   };
+
+  useEffect(() => {
+    openCustomerCenter();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>

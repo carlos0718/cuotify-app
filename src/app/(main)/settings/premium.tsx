@@ -60,12 +60,6 @@ const SLIDES = [
 export default function PremiumScreen() {
   const { setPremium } = useSubscriptionStore();
 
-  useEffect(() => {
-    if (!isExpoGo) {
-      presentNativePaywall();
-    }
-  }, []);
-
   const presentNativePaywall = async () => {
     try {
       const result = await RevenueCatUI.presentPaywallIfNeeded({
@@ -89,6 +83,12 @@ export default function PremiumScreen() {
       router.back();
     }
   };
+
+  useEffect(() => {
+    if (!isExpoGo) {
+      presentNativePaywall();
+    }
+  }, []);
 
   if (!isExpoGo) {
     return (

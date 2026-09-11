@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -47,8 +47,23 @@ export function Toast({
   onHide,
 }: ToastProps) {
   const insets = useSafeAreaInsets();
-  const translateY = useRef(new Animated.Value(120)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
+  const [translateY] = useState(() => new Animated.Value(120));
+  const [opacity] = useState(() => new Animated.Value(0));
+
+  const hideToast = () => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: 120,
+        duration: 240,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => onHide());
+  };
 
   useEffect(() => {
     if (visible) {
@@ -74,21 +89,6 @@ export function Toast({
       return () => clearTimeout(timer);
     }
   }, [visible]);
-
-  const hideToast = () => {
-    Animated.parallel([
-      Animated.timing(translateY, {
-        toValue: 120,
-        duration: 240,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => onHide());
-  };
 
   if (!visible) return null;
 
