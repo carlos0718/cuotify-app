@@ -625,12 +625,17 @@ un linter en 5 segundos.
 ```
 con `eslint-config-expo` y un workflow de GitHub Actions que corra ambos en cada push.
 
-### 🟡 A9 · `package.json` 1.0.2 vs `app.json` 1.0.1
-Las versiones ya están desincronizadas. Con `versionCode: 3` en Android, hay que
-elegir una fuente de verdad antes de subir a las stores.
+### ✅ A9 · `package.json` 1.0.2 vs `app.json` 1.0.1 — Resuelto
+Las versiones estaban desincronizadas. No había ningún lugar en la UI mostrando la
+versión hardcodeada (se revisó — no hace falta `expo-constants` para leer la de
+`app.json`, no hay drift que corregir ahí).
 
-**Fix:** usar `expo-constants` para leer la versión de `app.json` en la UI, y considerar
-`autoIncrement` en `eas.json` para el build number.
+**Fix aplicado:** ambos archivos bumpeados a **1.0.3** (PATCH — todo lo acumulado
+desde el último número fue `fix`, sin features ni breaking changes) en el mismo
+commit, siguiendo la regla de `AGENTS.md` § "Versionado y releases". `versionCode`
+(Android, hoy en `3`) queda igual — se incrementa recién antes del próximo submit a
+Play Console, no en cada bump de SemVer. `autoIncrement` en `eas.json` para
+automatizarlo queda como mejora futura, no bloqueante.
 
 ---
 

@@ -32,6 +32,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 - `getNextLoanColor` comparaba un `string` genérico contra la tupla de literales de `colors.loanColors` (`as const`) — `tsc --noEmit` lo marcaba en `pastelColors.indexOf(lastColor)` (L16)
 - `database.types.ts` estaba desactualizado a mano: le faltaban las tablas `personal_debts`, `debt_payments` y `notification_preferences` — regenerado contra el schema real, lo que sacó 27 `as never`/`as any` que ya no hacían falta en `loans.ts`, `personalDebts.ts`, `notificationPreferences.ts` y `loans/analyze.tsx` (A7)
 - `.update()` en `settings/profile.tsx` fallaba contra los tipos regenerados (`profile?.id` como `string | undefined`) — se agregó un guard `if (!profile) return` (L17)
+- `package.json` (1.0.2) y `app.json` (1.0.1) desincronizados — unificados a 1.0.3 (A9)
 
 ### Security
 - Dump y sincronización del schema real de Supabase con `supabase/migrations/`, que estaba desactualizado (S3)
@@ -48,4 +49,4 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 - Import de préstamos y resúmenes de tarjeta por IA
 - Adopción del proyecto con skill `rocky-spec`: `SPEC.md`, `AGENTS.md`/`CLAUDE.md`, `TODO.md`, `design-system/MASTER.md`, `docs/IMPROVEMENTS.md`
 
-> Nota: `package.json` declara `1.0.2` y `app.json` declara `1.0.1` — desincronizados, ver `TODO.md` § A9. Esta entrada usa la versión de `package.json`; corregir la discrepancia antes del próximo release real.
+> Nota: al generarse este archivo, `package.json` declaraba `1.0.2` y `app.json` declaraba `1.0.1` — desincronizados (§ A9). Esta entrada usa la versión de `package.json` de ese momento; la discrepancia se corrigió en `[Unreleased]` (ambos a 1.0.3).
