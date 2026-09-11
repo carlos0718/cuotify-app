@@ -64,7 +64,7 @@ El objetivo es no frustrar a usuarios casuales con límites razonables, mientras
 
 **Configuración RevenueCat:**
 
-- API Key: `test_JchOkvEzlhSdWAJnCRZjXxRBAkU` _(reemplazar con prod key al publicar)_
+- API Key: en `.env` como `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` (hoy la misma test key en ambas; reemplazar con las de prod al publicar)
 - Entitlement: `Cuotify Pro`
 - Offering: `default` (3 packages: monthly, yearly, lifetime)
 
