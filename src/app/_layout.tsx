@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native';
 import { useAuthStore, useSubscriptionStore } from '../store';
 import { initializePurchases } from '../services/subscription';
-import { ToastProvider } from '../components';
+import { ToastProvider, ErrorFallback } from '../components';
 import {
   registerForPushNotifications,
   savePushToken,
@@ -94,6 +94,16 @@ export default function RootLayout() {
             <Stack.Screen name="(main)" />
           </Stack>
         </ToastProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
+
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  return (
+    <GestureHandlerRootView style={styles.container}>
+      <SafeAreaProvider>
+        <ErrorFallback error={error} retry={retry} />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

@@ -134,7 +134,7 @@
       Nota: el perfil `development` de `eas.json` no tiene bloque `env` (no hace
       falta: las `EXPO_PUBLIC_*` se inyectan al bundlear local desde `.env`).
 - [ ] **S8** Eliminación de cuenta + política de privacidad
-- [ ] **A4** `ErrorBoundary` en los layouts raíz
+- [x] **A4** `ErrorBoundary` en los layouts raíz
 - [ ] **A5** Sentry para crash reporting
 - [ ] **S5** Keys de RevenueCat fuera del código
 - [ ] **A9** Unificar versión entre `package.json` y `app.json`

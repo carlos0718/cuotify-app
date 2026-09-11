@@ -4,3 +4,5 @@ export { ToastProvider, useToast } from './ToastProvider';
 export { PasswordInput } from './PasswordInput';
 export { Modal } from './Modal';
 export { PhoneInput } from './PhoneInput';
+export { ErrorFallback } from './ErrorFallback';
+export type { ErrorFallbackProps } from './ErrorFallback';

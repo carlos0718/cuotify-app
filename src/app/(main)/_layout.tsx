@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useAuthStore } from '../../store';
 import { colors, fontSize, fontWeight } from '../../theme';
+import { ErrorFallback } from '../../components';
 
 // Iconos SVG personalizados
 function HomeIcon({ color, size = 24 }: { color: ColorValue; size?: number }) {
@@ -216,6 +217,10 @@ export default function MainLayout() {
       />
     </Tabs>
   );
+}
+
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  return <ErrorFallback error={error} retry={retry} />;
 }
 
 const styles = StyleSheet.create({
