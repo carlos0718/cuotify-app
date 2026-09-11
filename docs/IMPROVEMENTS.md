@@ -409,15 +409,17 @@ que se filtran al store de auth.
 usando el tipo `Session` de `@supabase/supabase-js` — elimina el cast implícito y el
 error de `tsc --noEmit` en `authStore.ts:79`.
 
-### 🟡 L15 · `Modal` con `style: 'secondary'` que no existe en el tipo del componente
-`src/app/(main)/loans/create.tsx:634` pasa `style: 'secondary'` a un botón del
+### ✅ L15 · `Modal` con `style: 'secondary'` que no existe en el tipo del componente — Resuelto
+`src/app/(main)/loans/create.tsx:634` pasaba `style: 'secondary'` a un botón del
 `Modal`, pero `src/components/ui/Modal.tsx:7` solo acepta
-`'default' | 'cancel' | 'destructive' | 'primary'`. Hoy no rompe en runtime (React
-Native ignora el estilo desconocido y cae al default visual), pero es un typo que
-`tsc --noEmit` ya puede detectar.
+`'default' | 'cancel' | 'destructive' | 'primary'`. No rompía en runtime (React
+Native ignoraba el estilo desconocido y caía al default visual), pero era un typo
+que `tsc --noEmit` ya detectaba.
 
-**Fix:** cambiar a `'default'` (o el estilo visual que corresponda) en el callsite —
-no ampliar el tipo del componente para acomodar un typo.
+**Fix aplicado:** cambiado a `'cancel'` — es un botón "Cerrar" que solo descarta el
+modal sin acción, el mismo caso que usa `style: 'cancel'` en todos los demás
+modales del proyecto (`loans/[id].tsx`, `debts/[id].tsx`, `settings/index.tsx`,
+etc.). No se amplió el tipo del componente para acomodar el typo.
 
 ### 🟡 L16 · `getNextLoanColor`/`getLoanColorByIndex` no aceptan `string` genérico contra la paleta tipada
 `src/utils/loanColors.ts:17` hace `pastelColors.indexOf(lastColor)` donde
