@@ -11,6 +11,13 @@
     "claude_md_generated": "merged",
     "todo_generated": true,
     "design_system_generated": true,
-    "improvements_audit_generated": true
-  }
+    "improvements_audit_generated": true,
+    "constitution_generated": true,
+    "security_generated": true,
+    "observability_generated": true,
+    "accessibility_generated": true,
+    "changelog_generated": true,
+    "license_decision": "proprietary"
+  },
+  "last_drift_check": "2026-09-11T00:00:00.000Z"
 }
