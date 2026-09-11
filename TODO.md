@@ -182,7 +182,7 @@
 - [x] **A8** ESLint + typecheck (`npx expo lint` + `tsc --noEmit`) — falta todavía el CI en GitHub Actions, ver `## Setup`
 - [ ] **L6** Unificar el cálculo duplicado TS / PL/pgSQL *(hacer con A3 ya listo)*
 - [x] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
-- [ ] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
+- [x] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [ ] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
 - [ ] **L16** `getNextLoanColor`/`getLoanColorByIndex` — mismatch de tipos contra la paleta literal
 - [ ] **L18** `validateSession` usada en `useEffect` antes de declararse en `reset-password.tsx` (error de lint, bloquea CI)
