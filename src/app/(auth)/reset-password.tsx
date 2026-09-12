@@ -25,10 +25,6 @@ export default function ResetPasswordScreen() {
   const [isValidSession, setIsValidSession] = useState(false);
   const { showSuccess, showError } = useToast();
 
-  useEffect(() => {
-    validateSession();
-  }, []);
-
   const validateSession = async () => {
     try {
       // La sesión ya fue creada: al verificar el código de recuperación
@@ -52,6 +48,14 @@ export default function ResetPasswordScreen() {
       setIsValidating(false);
     }
   };
+
+  useEffect(() => {
+    // validateSession es async: el setState corre en un microtask después del
+    // await, no de forma síncrona durante el commit del efecto — falso positivo
+    // de la regla con funciones async llamadas por nombre.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    validateSession();
+  }, []);
 
   const handleResetPassword = async () => {
     if (!newPassword.trim()) {

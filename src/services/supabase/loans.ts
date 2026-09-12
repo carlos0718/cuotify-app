@@ -9,7 +9,7 @@ import { calculateLatePenalty } from '../calculations';
 export async function createBorrower(data: BorrowerInsert): Promise<Borrower> {
   const { data: borrower, error } = await supabase
     .from('borrowers')
-    .insert(data as never)
+    .insert(data)
     .select()
     .single();
 
@@ -92,7 +92,7 @@ export async function getOrCreateBorrower(data: BorrowerInsert): Promise<{ borro
         if (linkedId) {
           await supabase
             .from('borrowers')
-            .update({ linked_profile_id: linkedId } as never)
+            .update({ linked_profile_id: linkedId })
             .eq('id', existingByDni.id);
           return { borrower: { ...existingByDni, linked_profile_id: linkedId }, isNew: false };
         }
@@ -125,7 +125,7 @@ export async function getOrCreateBorrower(data: BorrowerInsert): Promise<{ borro
 export async function createLoan(data: LoanInsert): Promise<Loan> {
   const { data: loan, error } = await supabase
     .from('loans')
-    .insert(data as never)
+    .insert(data)
     .select()
     .single();
 
@@ -280,7 +280,7 @@ export async function updateAllLoanColors(loanColors: string[]): Promise<number>
     const colorIndex = i % loanColors.length;
     const { error: updateError } = await supabase
       .from('loans')
-      .update({ color_code: loanColors[colorIndex] } as never)
+      .update({ color_code: loanColors[colorIndex] })
       .eq('id', loans[i].id);
 
     if (!updateError) {
@@ -305,11 +305,11 @@ export async function getLoanById(id: string) {
   loan.lender = null;
 
   // Traer el nombre del prestamista por separado para evitar conflictos de RLS
-  if ((data as any).lender_id) {
+  if (loan.lender_id) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('id, full_name')
-      .eq('id', (data as any).lender_id)
+      .eq('id', loan.lender_id)
       .maybeSingle();
     if (profile) loan.lender = profile as { id: string; full_name: string };
   }
@@ -346,7 +346,7 @@ export async function getActiveLoans() {
 export async function updateLoanStatus(id: string, status: Loan['status']) {
   const { data, error } = await supabase
     .from('loans')
-    .update({ status } as never)
+    .update({ status })
     .eq('id', id)
     .select()
     .single();
@@ -441,7 +441,7 @@ export async function markPaymentAsPaid(paymentId: string, paidAmount: number) {
       status: 'paid',
       paid_amount: paidAmount,
       paid_date: new Date().toISOString().split('T')[0],
-    } as never)
+    })
     .eq('id', paymentId)
     .select()
     .single();
@@ -463,7 +463,7 @@ export async function markPaymentAsPaid(paymentId: string, paidAmount: number) {
   if (allPaid) {
     await supabase
       .from('loans')
-      .update({ status: 'completed' } as never)
+      .update({ status: 'completed' })
       .eq('id', loanId);
   }
 
@@ -489,7 +489,7 @@ export async function revertPaymentToPending(paymentId: string) {
       status: 'pending',
       paid_amount: 0,
       paid_date: null,
-    } as never)
+    })
     .eq('id', paymentId)
     .select()
     .single();
@@ -499,7 +499,7 @@ export async function revertPaymentToPending(paymentId: string) {
   // 3. Si el préstamo estaba completado, volver a estado activo
   await supabase
     .from('loans')
-    .update({ status: 'active' } as never)
+    .update({ status: 'active' })
     .eq('id', loanId)
     .eq('status', 'completed');
 
@@ -512,7 +512,7 @@ export async function addBorrowerComment(paymentId: string, comment: string) {
     .update({
       borrower_comment: comment,
       borrower_comment_date: new Date().toISOString(),
-    } as never)
+    })
     .eq('id', paymentId)
     .select()
     .single();
@@ -647,10 +647,10 @@ export async function getLoanStats(): Promise<LoanStats> {
 
   const [paidResult, pendingResult] = await Promise.all([
     loanIds.length
-      ? supabase.from('payments').select('loan_id, paid_amount').eq('status', 'paid' as never).in('loan_id', loanIds)
+      ? supabase.from('payments').select('loan_id, paid_amount').eq('status', 'paid').in('loan_id', loanIds)
       : Promise.resolve({ data: [], error: null }),
     loanIds.length
-      ? supabase.from('payments').select('loan_id, total_amount, penalty_amount').eq('status', 'pending' as never).in('loan_id', loanIds)
+      ? supabase.from('payments').select('loan_id, total_amount, penalty_amount').eq('status', 'pending').in('loan_id', loanIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -767,7 +767,7 @@ export async function updatePaymentPenalty(paymentId: string): Promise<Payment> 
       penalty_amount: penaltyResult.penaltyAmount,
       penalty_calculated_at: new Date().toISOString(),
       status: penaltyResult.isOverdue && paymentData.status === 'pending' ? 'overdue' : paymentData.status,
-    } as never)
+    })
     .eq('id', paymentId)
     .select()
     .single();
@@ -837,7 +837,7 @@ export async function updateLoanPenalties(loanId: string): Promise<Payment[]> {
         penalty_amount: penaltyResult.penaltyAmount,
         penalty_calculated_at: new Date().toISOString(),
         status: newStatus,
-      } as never)
+      })
       .eq('id', payment.id)
       .select()
       .single();
@@ -874,8 +874,7 @@ export interface MonthlyInterest {
  * Solo disponible para usuarios Pro.
  */
 export async function getMonthlyInterestEarned(): Promise<MonthlyInterest[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc('get_monthly_interest_earned');
+  const { data, error } = await supabase.rpc('get_monthly_interest_earned');
   if (error) throw new Error(handleSupabaseError(error));
   return (data || []) as MonthlyInterest[];
 }

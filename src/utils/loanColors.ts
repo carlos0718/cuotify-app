@@ -13,8 +13,10 @@ export function getNextLoanColor(lastColor?: string | null): string {
     return pastelColors[0];
   }
 
-  // Encontrar el índice del último color usado
-  const lastIndex = pastelColors.indexOf(lastColor);
+  // Encontrar el índice del último color usado. Cast a readonly string[]:
+  // pastelColors es una tupla de literales (colors.loanColors usa `as const`),
+  // pero lastColor viene de la DB como string genérico.
+  const lastIndex = (pastelColors as readonly string[]).indexOf(lastColor);
 
   if (lastIndex === -1) {
     // Si el color no está en la paleta, devolver el primero

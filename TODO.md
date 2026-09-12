@@ -14,10 +14,19 @@
 - [x] Design tokens en `src/theme/`
 - [x] EAS Build configurado (`eas.json`)
 - [x] RevenueCat integrado
-- [ ] ESLint + `typecheck` en scripts de npm — ver `IMPROVEMENTS.md` § A8
-- [ ] Jest (`jest-expo`) configurado
-- [ ] CI en GitHub Actions (lint + typecheck + test)
-- [ ] Crear rama `dev` desde `master`, si se decide adoptar GitFlow completo (hoy se trabaja directo sobre `master` — ver `AGENTS.md` § "Branching — GitFlow simplificado")
+- [x] ESLint + `typecheck` en scripts de npm — ver `IMPROVEMENTS.md` § A8
+      (`npx expo lint` configuró `eslint-config-expo`; `tsc --noEmit` excluye
+      `supabase/functions/` en `tsconfig.json` porque son Edge Functions Deno,
+      no código Node/Expo. Encontraron 62 problemas de lint y 6 errores de tipos
+      reales — quedan como tareas nuevas L14-L17 en el Bloque 3, L12 ya estaba)
+- [x] Jest (`jest-expo`) configurado — preset en `package.json`, primer smoke test en
+      `src/services/calculations/__tests__/loanCalculator.test.ts`. `@react-native/jest-preset`
+      quedó pineado a `0.86.3` (exacto, no caret) para que coincida con la versión real de
+      `react-native` — `expo install` resolvió `^0.87.1` y rompía el preset
+- [x] CI en GitHub Actions (lint + typecheck + test) — `.github/workflows/ci.yml`, corre en
+      push/PR a `master`/`development`. El primer run va a salir en 🔴 por la deuda ya
+      conocida (L12, L14-L18) — es esperado, no un problema de la config del workflow
+- [x] Crear rama `development` desde `master` — GitFlow simplificado adoptado (ver `AGENTS.md` § "Branching — GitFlow simplificado")
 
 ## Dominio / DB
 
@@ -34,7 +43,7 @@
       `borrower_comment`/`borrower_comment_date` cuando quien edita no es el lender)
 - [x] 🔴 Migración 010: cerrar el INSERT abierto de notificaciones — § S2
 - [x] 🔴 Migración 012: `interest_rate` a `DECIMAL(8,2)` — § L3
-- [ ] Regenerar `database.types.ts` contra el schema real — § A7
+- [x] Regenerar `database.types.ts` contra el schema real — § A7
 - [ ] Cron (`pg_cron`) que recalcule mora diariamente — § L7
 - [ ] RPC transaccional `mark_payment_paid` / `revert_payment` — § L8
 
@@ -162,7 +171,7 @@
 - [x] **A4** `ErrorBoundary` en los layouts raíz
 - [ ] **A5** Sentry para crash reporting
 - [x] **S5** Keys de RevenueCat fuera del código
-- [ ] **A9** Unificar versión entre `package.json` y `app.json`
+- [x] **A9** Unificar versión entre `package.json` y `app.json` (ambos en 1.0.3)
 - [ ] `assets/icon.png` no es cuadrado (1874×1761) — `expo-doctor` lo marca.
       Apple exige 1024×1024 exacto y sin canal alfa. Bloquea el submit, no el build.
 - [ ] **S7** Mapear errores de Postgres a mensajes en español
@@ -170,9 +179,17 @@
 # 🟠 Bloque 3 — Red de seguridad
 
 - [ ] **A3** Tests unitarios de `loanCalculator.ts` (simple, francés, mora, bordes)
-- [ ] **A8** ESLint + typecheck + CI
+- [x] **A8** ESLint + typecheck (`npx expo lint` + `tsc --noEmit`) — falta todavía el CI en GitHub Actions, ver `## Setup`
 - [ ] **L6** Unificar el cálculo duplicado TS / PL/pgSQL *(hacer con A3 ya listo)*
-- [ ] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
+- [x] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
+- [x] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
+- [x] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
+- [x] **L16** `getNextLoanColor`/`getLoanColorByIndex` — mismatch de tipos contra la paleta literal
+- [x] **A7** Regenerar `database.types.ts` contra el schema real, sacar los `as never`/`as any` que ya no hacían falta (27 en 5 archivos)
+- [x] **L17** `.update()` sin tipar en `settings/profile.tsx` — resuelto junto con A7
+- [x] **L18** Función usada en `useEffect` antes de declararse — 4 archivos (error de lint, bloqueaba CI)
+- [x] **L19** `Toast.tsx` leía refs (`useRef(...).current`) durante el render (error de lint, bloqueaba CI)
+- [x] **L20** Falso positivo de `react-hooks/set-state-in-effect` en `reset-password.tsx` — suprimido con comentario
 
 # 🟡 Deuda técnica (detectada al adoptar el proyecto)
 

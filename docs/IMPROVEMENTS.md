@@ -398,6 +398,94 @@ advertencia no bloqueante. La verificación real la da el email de confirmación
 todos los campos), y `zodResolver`. Elimina ~150 líneas de validación duplicada y da
 tipos derivados del schema.
 
+### 🟡 L14 · `onAuthStateChange` tipa la sesión como `unknown`
+`src/services/supabase/auth.ts:150-153` expone el callback con
+`session: unknown`, y `authStore.ts:79` lee `session.user` sobre ese `unknown` sin
+castear primero — el proyecto viene del mismo problema que documenta el "Caveat on the
+`as never` pattern" de `AGENTS.md`/`CLAUDE.md`: tipos débiles en el borde de Supabase
+que se filtran al store de auth.
+
+**Fix:** tipar el callback como `(event: string, session: Session | null) => void`
+usando el tipo `Session` de `@supabase/supabase-js` — elimina el cast implícito y el
+error de `tsc --noEmit` en `authStore.ts:79`.
+
+### ✅ L15 · `Modal` con `style: 'secondary'` que no existe en el tipo del componente — Resuelto
+`src/app/(main)/loans/create.tsx:634` pasaba `style: 'secondary'` a un botón del
+`Modal`, pero `src/components/ui/Modal.tsx:7` solo acepta
+`'default' | 'cancel' | 'destructive' | 'primary'`. No rompía en runtime (React
+Native ignoraba el estilo desconocido y caía al default visual), pero era un typo
+que `tsc --noEmit` ya detectaba.
+
+**Fix aplicado:** cambiado a `'cancel'` — es un botón "Cerrar" que solo descarta el
+modal sin acción, el mismo caso que usa `style: 'cancel'` en todos los demás
+modales del proyecto (`loans/[id].tsx`, `debts/[id].tsx`, `settings/index.tsx`,
+etc.). No se amplió el tipo del componente para acomodar el typo.
+
+### ✅ L16 · `getNextLoanColor` no aceptaba `string` genérico contra la paleta tipada — Resuelto
+`src/utils/loanColors.ts:17` hacía `pastelColors.indexOf(lastColor)` donde
+`pastelColors` es la tupla de los 10 hex literales de `colors.loanColors`
+(`as const`) y `lastColor` es `string` (viene de la DB) — TS exige que el
+argumento de `indexOf` sea del mismo tipo literal que los elementos del array.
+
+**Fix aplicado:** `(pastelColors as readonly string[]).indexOf(lastColor)` —
+se mantiene la literalidad de `colors.loanColors` (no hace falta relajarla en
+otro lado) y se castea puntualmente en el único callsite que compara contra un
+`string` genérico.
+
+### ✅ L18 · Función usada en un `useEffect` antes de declararse — Resuelto
+El mismo patrón aparecía en **4 archivos**, no solo en el que se detectó primero:
+`src/app/(auth)/reset-password.tsx:28-32` (`validateSession`),
+`src/app/(main)/settings/customer-center.tsx:19-23` (`openCustomerCenter`),
+`src/app/(main)/settings/premium.tsx:63-69` (`presentNativePaywall`) y
+`src/components/ui/Toast.tsx:53-71` (`hideToast`). Todos funcionan en runtime
+(React corre los efectos después del render, cuando la función ya está asignada),
+pero `eslint-config-expo` (regla `react-hooks/immutability`) los marca como
+**error** — eran 4 de los 10 errores que bloqueaban `npm run lint` / el CI.
+
+**Fix aplicado:** mover la declaración de la función antes del `useEffect` que la
+usa, en los 4 archivos. Sin cambio de comportamiento, solo de orden.
+
+### ✅ L19 · `Toast.tsx` leía refs (`useRef(...).current`) durante el render — Resuelto
+`src/components/ui/Toast.tsx:50-51` guardaba los `Animated.Value` de la animación
+con `useRef(new Animated.Value(...)).current` y los leía directamente en el JSX
+(`style={[..., { transform: [{ translateY }], opacity }]}`). La regla nueva
+`react-hooks/refs` (parte del set de reglas de React Compiler en
+`eslint-plugin-react-hooks`) prohíbe leer un ref durante el render — apareció como
+6 de los 10 errores de lint (3 por cada valor, una vez por cada punto de lectura).
+
+**Fix aplicado:** reemplazar `useRef(...).current` por
+`useState(() => new Animated.Value(...))[0]` — mismo patrón de valor estable que
+nunca dispara un re-render (no se llama al setter), pero ya no es un "ref" para
+el linter.
+
+### ✅ L20 · Falso positivo de `react-hooks/set-state-in-effect` en `reset-password.tsx` — Resuelto (suprimido)
+Al resolver L18 en `reset-password.tsx`, el linter pudo completar el análisis de
+ese `useEffect` y encontró una regla más: `react-hooks/set-state-in-effect` marcó
+la llamada a `validateSession()` porque esa función termina llamando
+`setIsValidSession`/`setIsValidating`. En los hechos esos `setState` corren en un
+microtask después de un `await`, no de forma síncrona durante el commit del
+efecto — es un patrón estándar (validar sesión al montar) y no dispara el problema
+real que la regla busca evitar (cascading renders síncronos).
+
+**Fix aplicado:** `// eslint-disable-next-line react-hooks/set-state-in-effect`
+con un comentario explicando el porqué, siguiendo la misma convención que usaba
+el repo para otras reglas (ver A7 — esos otros `eslint-disable` puntuales de
+`@typescript-eslint/no-explicit-any` ya no existen, se sacaron al regenerar los
+tipos).
+
+### ✅ L17 · `.update()` sin tipar en `settings/profile.tsx` — Resuelto (síntoma de A7)
+`src/app/(main)/settings/profile.tsx:36-41` llamaba `.update({ full_name, phone, dni })`
+sin `as never`, y fallaba contra los tipos generados de `database.types.ts`
+(parámetro inferido como `never`) porque el archivo de tipos estaba desactualizado.
+Era el mismo síntoma que cubre **A7** (regenerar `database.types.ts` contra el
+schema real) — no se abrió como finding aparte, se resolvió al cerrar A7.
+
+Al regenerar los tipos también apareció un segundo error real en el mismo archivo:
+`.eq('id', profile?.id)` pasaba `string | undefined` a una columna `id: string`
+(el `id` ya no era opcional en los tipos reales). Se agregó un `if (!profile) return;`
+al principio de `handleSave` — no hacía falta el optional chaining para algo que
+la pantalla ya asume que existe.
+
 ---
 
 ## 3. Arquitectura y calidad de código
@@ -487,14 +575,41 @@ los `export` nombrados de arriba (que son los que el código realmente usa).
 **Fix:** importar arriba y componer el objeto con las referencias ya importadas — o
 eliminar el objeto `theme`, dado que ningún archivo lo consume.
 
-### 🟡 A7 · 22 casos de `as any` / `as never`
-El `as never` en los inserts está documentado en `CLAUDE.md` como patrón aceptado, y es
-un workaround conocido de los tipos generados de Supabase. Pero ya causó un bug real
-(**S4**: `end_date: null as never` silenció una violación de `NOT NULL`).
+### ✅ A7 · 22 casos de `as any` / `as never` — Resuelto
+`database.types.ts` estaba escrito a mano y desactualizado: le faltaban por completo
+las tablas `personal_debts`, `debt_payments` y `notification_preferences` (existían
+en producción desde antes de S3, pero nunca se agregaron a los tipos), y los campos
+`status`/`interest_type`/`currency`/etc. estaban tipados como unions literales que
+no correspondían a columnas `TEXT` con `CHECK` (el generador real las tipa como
+`string`). Sin esas tablas en `Database`, cualquier `.from('personal_debts')` /
+`.from('notification_preferences')` quedaba sin tipo real, forzando `as never` en
+cada insert/update — exactamente el mecanismo que causó **S4**
+(`end_date: null as never` silenció una violación de `NOT NULL`).
 
-**Fix:** regenerar los tipos contra el schema real (`supabase gen types typescript`)
-después de resolver S3. Con tipos correctos, la mayoría de los `as never` desaparecen y
-los que queden marcan problemas reales.
+**Fix aplicado:**
+1. `npx supabase gen types typescript --linked` contra el proyecto real (bloqueado al
+   principio por el proyecto pausado — Supabase pausa automáticamente los proyectos
+   free sin actividad; se reactivó desde el dashboard y generó sin problema).
+2. Se preservó la sección de "tipos auxiliares" (`Profile`, `Borrower`, `Loan`,
+   `Payment`, `*Insert`, `*Update`, `NotificationPreferences`) al final del archivo,
+   ahora derivada del `Database` real.
+3. Con tipos correctos, se sacaron **27** `as never`/`as any` que ya no hacían falta:
+   14 en `loans.ts` (incluida la llamada RPC `get_monthly_interest_earned`, que ya
+   estaba en el schema tipado), 8 en `personalDebts.ts` (incluida la RPC
+   `generate_debt_payment_schedule`), 1 en `notificationPreferences.ts`, 3 en
+   `loans/analyze.tsx` y 1 en `loans.ts` (`(data as any).lender_id`, reemplazado por
+   `loan.lender_id` ya tipado).
+4. Quedan **3** `as never`/`as any` sin tocar en `loans/index.tsx` y
+   `notifications/index.tsx` — son casts de rutas dinámicas de Expo Router
+   (`router.push(path as never)`), un problema de tipado de rutas ajeno a
+   `database.types.ts`, no a Supabase.
+5. Dos errores reales que quedaban ocultos por el `as never` de `profile.tsx`
+   aparecieron y se resolvieron ahí mismo (ver **L17**) y en `authStore.ts`/
+   `settings/index.tsx` (`profile.role` pasó a tipar `string | null` genérico —
+   se castea a `UserRole` en los 2 puntos donde se compara, verificado contra el
+   `CHECK` real de la columna en `001_initial_schema.sql:15`).
+
+`npx tsc --noEmit` y `npx expo lint` en 0 errores tras el cambio.
 
 ### 🟡 A8 · Sin ESLint ni type-check en CI
 No hay `lint` ni `typecheck` en los scripts de `package.json`, y no hay workflow de CI.
@@ -510,12 +625,17 @@ un linter en 5 segundos.
 ```
 con `eslint-config-expo` y un workflow de GitHub Actions que corra ambos en cada push.
 
-### 🟡 A9 · `package.json` 1.0.2 vs `app.json` 1.0.1
-Las versiones ya están desincronizadas. Con `versionCode: 3` en Android, hay que
-elegir una fuente de verdad antes de subir a las stores.
+### ✅ A9 · `package.json` 1.0.2 vs `app.json` 1.0.1 — Resuelto
+Las versiones estaban desincronizadas. No había ningún lugar en la UI mostrando la
+versión hardcodeada (se revisó — no hace falta `expo-constants` para leer la de
+`app.json`, no hay drift que corregir ahí).
 
-**Fix:** usar `expo-constants` para leer la versión de `app.json` en la UI, y considerar
-`autoIncrement` en `eas.json` para el build number.
+**Fix aplicado:** ambos archivos bumpeados a **1.0.3** (PATCH — todo lo acumulado
+desde el último número fue `fix`, sin features ni breaking changes) en el mismo
+commit, siguiendo la regla de `AGENTS.md` § "Versionado y releases". `versionCode`
+(Android, hoy en `3`) queda igual — se incrementa recién antes del próximo submit a
+Play Console, no en cada bump de SemVer. `autoIncrement` en `eas.json` para
+automatizarlo queda como mejora futura, no bloqueante.
 
 ---
 

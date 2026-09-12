@@ -631,7 +631,7 @@ export default function CreateLoanScreen() {
               onClose={() => setShowDatePicker(false)}
               title="Fecha de préstamo"
               icon="📅"
-              buttons={[{ text: 'Cerrar', style: 'secondary', onPress: () => setShowDatePicker(false) }]}
+              buttons={[{ text: 'Cerrar', style: 'cancel', onPress: () => setShowDatePicker(false) }]}
             >
               <Calendar
                 current={deliveryDateInput || new Date().toISOString().split('T')[0]}

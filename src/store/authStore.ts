@@ -77,7 +77,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           const profile = await getCurrentProfile();
           set({
             user: session.user,
-            session: session as Session,
+            session,
             profile,
           });
         } else if (event === 'SIGNED_OUT') {
@@ -87,7 +87,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             profile: null,
           });
         } else if (event === 'TOKEN_REFRESHED' && session) {
-          set({ session: session as Session });
+          set({ session });
         }
       });
     } catch (error) {
@@ -204,6 +204,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   getRole: () => {
     const state = get();
-    return state.profile?.role || null;
+    return (state.profile?.role as UserRole | null) || null;
   },
 }));

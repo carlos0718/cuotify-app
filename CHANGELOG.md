@@ -25,6 +25,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 - `formatCurrency` no pasaba la moneda real en `loans/[id].tsx` y `calendar/index.tsx`, mostraba préstamos en USD como si fueran ARS (L1)
 - Stats de prestamista/prestatario mezclaban montos de distintas monedas — separadas por moneda en dashboard, préstamos y deudas (L2)
 - Faltaba filtro por `lender_id` en `getActiveLoans`, `getUpcomingPayments` y `getOverduePayments` (L4)
+- `validateEmail` rechazaba dominios válidos no listados (`.tech`, `.ai`, etc.) por una allowlist cerrada de TLDs, y tenía una clave duplicada sin efecto en `COMMON_TLD_TYPOS` — ahora los TLDs desconocidos solo generan una advertencia no bloqueante (L12)
+- `onAuthStateChange` tipaba la sesión como `unknown`, obligando a castear en `authStore.ts` sin garantía real — ahora usa el tipo `Session | null` de `@supabase/supabase-js` (L14)
+- CI en rojo por 10 errores de lint: funciones usadas en un `useEffect` antes de declararse en `reset-password.tsx`, `customer-center.tsx`, `premium.tsx` y `Toast.tsx` (L18); refs leídas durante el render en `Toast.tsx` (L19); falso positivo de `react-hooks/set-state-in-effect` en `reset-password.tsx`, suprimido con comentario (L20)
+- `Modal` con `style: 'secondary'` (no existe en el tipo del componente) en el botón "Cerrar" del calendario de `loans/create.tsx` — cambiado a `'cancel'`, el mismo estilo que usan todos los demás modales del proyecto para ese caso (L15)
+- `getNextLoanColor` comparaba un `string` genérico contra la tupla de literales de `colors.loanColors` (`as const`) — `tsc --noEmit` lo marcaba en `pastelColors.indexOf(lastColor)` (L16)
+- `database.types.ts` estaba desactualizado a mano: le faltaban las tablas `personal_debts`, `debt_payments` y `notification_preferences` — regenerado contra el schema real, lo que sacó 27 `as never`/`as any` que ya no hacían falta en `loans.ts`, `personalDebts.ts`, `notificationPreferences.ts` y `loans/analyze.tsx` (A7)
+- `.update()` en `settings/profile.tsx` fallaba contra los tipos regenerados (`profile?.id` como `string | undefined`) — se agregó un guard `if (!profile) return` (L17)
+- `package.json` (1.0.2) y `app.json` (1.0.1) desincronizados — unificados a 1.0.3 (A9)
 
 ### Security
 - Dump y sincronización del schema real de Supabase con `supabase/migrations/`, que estaba desactualizado (S3)
@@ -41,4 +49,4 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 - Import de préstamos y resúmenes de tarjeta por IA
 - Adopción del proyecto con skill `rocky-spec`: `SPEC.md`, `AGENTS.md`/`CLAUDE.md`, `TODO.md`, `design-system/MASTER.md`, `docs/IMPROVEMENTS.md`
 
-> Nota: `package.json` declara `1.0.2` y `app.json` declara `1.0.1` — desincronizados, ver `TODO.md` § A9. Esta entrada usa la versión de `package.json`; corregir la discrepancia antes del próximo release real.
+> Nota: al generarse este archivo, `package.json` declaraba `1.0.2` y `app.json` declaraba `1.0.1` — desincronizados (§ A9). Esta entrada usa la versión de `package.json` de ese momento; la discrepancia se corrigió en `[Unreleased]` (ambos a 1.0.3).
