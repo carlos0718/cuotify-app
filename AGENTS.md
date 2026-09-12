@@ -421,7 +421,7 @@ git checkout -b feature/nombre-corto    # o fix/nombre-corto
 Este proyecto sigue [SemVer](https://semver.org/lang/es/) y mantiene `CHANGELOG.md` en formato Keep a Changelog.
 
 - **`[Unreleased]`** se va llenando commit a commit (paso 1-bis del Workflow de Git).
-- **No se taguea en cada commit.** Un release es un build subido a las stores vía EAS Submit — decisión explícita.
+- **No se taguea en cada commit.** Se taguea (`vMAJOR.MINOR.PATCH` + GitHub Release) cuando se cierra un lote significativo de fixes/features acumulados en `[Unreleased]` — es una decisión explícita, independiente de si ya hay un build subido a las stores. El submit a TestFlight/Play Console vía EAS Submit es un evento aparte, no un prerequisito para taguear (ver `CHANGELOG.md` entrada `v1.1.0`, primer tag del proyecto, sin build de producción subido todavía).
 - **Ojo con la versión duplicada**: hoy vive en `package.json` y `app.json` y pueden desalinearse (§ A9 del `TODO.md`) — cualquier bump debe tocar los dos.
 - **Qué bump corresponde**: `fix` → PATCH · `feat` → MINOR · breaking change → MAJOR.
 
