@@ -422,6 +422,12 @@ Este proyecto sigue [SemVer](https://semver.org/lang/es/) y mantiene `CHANGELOG.
 
 - **`[Unreleased]`** se va llenando commit a commit (paso 1-bis del Workflow de Git).
 - **No se taguea en cada commit.** Se taguea (`vMAJOR.MINOR.PATCH` + GitHub Release) cuando se cierra un lote significativo de fixes/features acumulados en `[Unreleased]` — es una decisión explícita, independiente de si ya hay un build subido a las stores. El submit a TestFlight/Play Console vía EAS Submit es un evento aparte, no un prerequisito para taguear (ver `CHANGELOG.md` entrada `v1.1.0`, primer tag del proyecto, sin build de producción subido todavía).
+- **Cómo hacer un release** cuando corresponda:
+  1. Mover `[Unreleased]` a `## [X.Y.Z] - {fecha}` en `CHANGELOG.md`, dejando un `[Unreleased]` vacío arriba.
+  2. Bumpear versión en `package.json` **y** `app.json` (ver punto siguiente) — commit `chore(release): version X.Y.Z`.
+  3. `git tag -a vX.Y.Z -m "..."` y `git push origin vX.Y.Z`; crear el GitHub Release del tag (`gh release create`) con las notas del `CHANGELOG.md`.
+  4. Sincronizar `development` con `master` si `master` quedó adelantada (`git checkout development && git merge master && git push`).
+  5. Después de mergear a la rama principal: listar `git branch --merged master` (menos `master`/`development`) y preguntarle al usuario cuáles borrar (local + remoto) — nunca borrar sin confirmar, y nunca ofrecer una rama que no esté 100% mergeada.
 - **Ojo con la versión duplicada**: hoy vive en `package.json` y `app.json` y pueden desalinearse (§ A9 del `TODO.md`) — cualquier bump debe tocar los dos.
 - **Qué bump corresponde**: `fix` → PATCH · `feat` → MINOR · breaking change → MAJOR.
 
