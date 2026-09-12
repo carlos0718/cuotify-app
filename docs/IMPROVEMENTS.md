@@ -637,6 +637,28 @@ commit, siguiendo la regla de `AGENTS.md` § "Versionado y releases". `versionCo
 Play Console, no en cada bump de SemVer. `autoIncrement` en `eas.json` para
 automatizarlo queda como mejora futura, no bloqueante.
 
+### 🔴 A10 · `react-native-worklets-core` sin usar rompía todo build de Android — Resuelto
+Detectado corriendo `eas build --profile preview-apk --platform android`: el build
+fallaba en la fase `RUN_GRADLEW` con
+
+```
+CMake Error at CMakeLists.txt:24 (add_library):
+  Target "rnworklets" links to target "hermes-engine::libhermes" but the
+  target was not found.
+```
+
+`package.json` tenía `react-native-worklets-core@^1.6.2` (paquete distinto de
+`react-native-worklets`, que sí usa Reanimated 4) declarado como dependencia
+directa, pero **no hay un solo import en `src/`**, ni referencia en `app.json`
+(plugins) ni en ningún config file — no lo requiere ningún otro paquete del
+lockfile tampoco. Su build nativo con CMake no es compatible con el NDK/Hermes
+que usa el SDK 57, y tumbaba el build completo de Android aunque nada de la app
+lo necesitara.
+
+**Fix aplicado:** eliminado de `package.json` + `npm install` para actualizar
+`package-lock.json`. Bloqueante de launch (🔴) porque impedía generar cualquier
+build de Android, no solo el de producción.
+
 ---
 
 ## 4. UX / UI
