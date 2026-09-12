@@ -6,11 +6,12 @@
 
 ## Gobernanza
 
-- **Versión de esta Constitution**: 1.0.0
+- **Versión de esta Constitution**: 1.0.1
 - **Fecha de ratificación**: 2026-09-11
-- **Última enmienda**: 2026-09-11
+- **Última enmienda**: 2026-09-12
 
 **Regla de enmienda** (versionado propio, independiente del SemVer del software — ver `.rocky-spec/reference/versioning.md` de la skill):
+
 - **MAJOR**: se elimina o redefine un artículo existente (ej. dejar de aplicar SOLID).
 - **MINOR**: se agrega un artículo nuevo (ej. sumar un requisito de accesibilidad que antes no estaba).
 - **PATCH**: aclaración de redacción sin cambio de fondo.
@@ -19,13 +20,13 @@
 
 ## Artículo 1 — Principios de código
 
-| Principio | Qué significa en la práctica |
-|---|---|
-| **SOLID** | Cada módulo tiene una sola razón para cambiar (SRP). Extender sin modificar lo existente (OCP). Interfaces pequeñas y específicas (ISP). Depender de abstracciones, no de implementaciones concretas (DIP). |
-| **DRY** | Si una lógica aparece dos veces, extraerla a una función, hook o constante — ej. el formulario de préstamo y el de deuda personal, hoy duplicados (ver `docs/IMPROVEMENTS.md` § A1). |
-| **KISS** | La solución más simple que resuelve el problema es la correcta. |
-| **YAGNI** | No implementar lo que no se necesita hoy. |
-| **Clean Code** | Nombres que se explican solos. Funciones < 30 líneas. Early returns. Logs estructurados, nunca `console.log("texto")` suelto — ver `OBSERVABILITY.md` para el criterio de este proyecto. |
+| Principio      | Qué significa en la práctica                                                                                                                                                                                |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SOLID**      | Cada módulo tiene una sola razón para cambiar (SRP). Extender sin modificar lo existente (OCP). Interfaces pequeñas y específicas (ISP). Depender de abstracciones, no de implementaciones concretas (DIP). |
+| **DRY**        | Si una lógica aparece dos veces, extraerla a una función, hook o constante — ej. el formulario de préstamo y el de deuda personal, hoy duplicados (ver `docs/IMPROVEMENTS.md` § A1).                        |
+| **KISS**       | La solución más simple que resuelve el problema es la correcta.                                                                                                                                             |
+| **YAGNI**      | No implementar lo que no se necesita hoy.                                                                                                                                                                   |
+| **Clean Code** | Nombres que se explican solos. Funciones < 30 líneas. Early returns. Logs estructurados, nunca `console.log("texto")` suelto — ver `OBSERVABILITY.md` para el criterio de este proyecto.                    |
 
 Detalle completo, ejemplos y contraejemplos en `.rocky-spec/reference/coding-principles.md` de la skill.
 
@@ -56,16 +57,17 @@ Checklist completo (OWASP adaptado) y decisiones específicas de este proyecto e
 
 - **Arquitectura elegida**: Layer-based (organización por capa técnica: `app/` rutas Expo Router, `components/`, `services/`, `store/`, `theme/`, `types/`, `utils/`) — ver `CLAUDE.md`/`AGENTS.md` sección "Architecture — Layer-based, with an unfinished extraction" para la justificación y el trade-off actual (extracción a `components/<feature>/` y `hooks/` incompleta).
 - **Patrones activos**:
-  - **Service layer** — todo el acceso a datos pasa por `src/services/supabase/` (`auth.ts`, `loans.ts`, `personalDebts.ts`, `client.ts`), nunca queries sueltas en las pantallas.
-  - **Store pattern (Zustand)** — estado global de sesión (`useAuthStore`) y preferencias persistidas (`usePreferencesStore`).
-  - **Strategy** — `loanCalculator.ts` aplica dos estrategias de interés intercambiables (simple / francés) sobre la misma interfaz de cálculo.
-  - **Trigger-driven side effects** — generación de cronogramas de pago vía trigger de Postgres (`after_loan_insert`) o RPC (`generate_debt_payment_schedule`), no en la capa de aplicación.
+    - **Service layer** — todo el acceso a datos pasa por `src/services/supabase/` (`auth.ts`, `loans.ts`, `personalDebts.ts`, `client.ts`), nunca queries sueltas en las pantallas.
+    - **Store pattern (Zustand)** — estado global de sesión (`useAuthStore`) y preferencias persistidas (`usePreferencesStore`).
+    - **Strategy** — `loanCalculator.ts` aplica dos estrategias de interés intercambiables (simple / francés) sobre la misma interfaz de cálculo.
+    - **Trigger-driven side effects** — generación de cronogramas de pago vía trigger de Postgres (`after_loan_insert`) o RPC (`generate_debt_payment_schedule`), no en la capa de aplicación.
 
 Estos patrones son la forma concreta en que este proyecto aplica el Artículo 1 (SOLID en particular) — no son una capa aparte, son su implementación.
 
 ## Artículo 6 — Boundaries
 
 **Preguntar primero** (no asumir, confirmar con el humano antes de aplicar):
+
 - Cualquier feature nueva o corrección: mostrar el plan (con o sin cambio de `SPEC.md`, según corresponda) y esperar confirmación explícita antes de tocar código.
 - Cambios de arquitectura que tocan 3+ módulos.
 - Agregar una dependencia nueva no trivial (más de un wrapper chico).
@@ -73,6 +75,7 @@ Estos patrones son la forma concreta en que este proyecto aplica el Artículo 1 
 - Cambiar el mecanismo de auth (Supabase Auth) o el alcance de las políticas RLS.
 
 **Nunca:**
+
 - Commitear secrets, API keys o `.env` con valores reales (incluye las keys de RevenueCat, ver `TODO.md` § S5).
 - Cambiar el schema de Supabase desde el dashboard — siempre migración numerada en `supabase/migrations/` (ver `CLAUDE.md`/`AGENTS.md` § S3).
 - Saltarse el Artículo 4 (Spec-Anchored) para cambios de dominio o alcance.
@@ -81,13 +84,14 @@ Estos patrones son la forma concreta en que este proyecto aplica el Artículo 1 
 
 ## Artículo 7 — Versionado y releases
 
-- Los commits siguen **Conventional Commits** con subject en español — el tipo (`feat`/`fix`/`feat!`) determina el bump de SemVer y si entra al `CHANGELOG.md`. Referenciar el ID del finding cuando aplique (`fix(loans): formatCurrency default a ARS (L1)`).
-- La versión del proyecto sigue **SemVer** (`MAJOR.MINOR.PATCH`) — romper compatibilidad es siempre MAJOR.
-- **La versión hoy vive en dos lugares** (`package.json` y `app.json`) y están desincronizados (1.0.2 vs 1.0.1) — unificarlas es la tarea § A9 del `TODO.md`; hasta que se resuelva, cualquier bump de versión debe tocar los dos archivos a mano.
-- Un release (tag de versión / build subido a las stores) es una decisión explícita, nunca automática por acumulación de commits.
-- **El merge nunca es automático** — después de commitear y pushear una rama, parar y mostrar un resumen del cambio antes de ejecutar `git merge`, esperando confirmación explícita.
+- Los commits siguen **Conventional Commits** — el tipo (`feat`/`fix`/`feat!`) no es una etiqueta libre, determina el bump de SemVer y si entra al `CHANGELOG.md`.
+- La versión del proyecto sigue **SemVer** (`MAJOR.MINOR.PATCH`) — romper compatibilidad es siempre MAJOR, sin excepción, incluso si el cambio fue chico de programar.
+- Un release (tag de versión) es una decisión explícita, nunca automática por acumulación de commits.
+- **La versión hoy vive en dos lugares** (`package.json` y `app.json`) — cualquier bump debe tocar los dos archivos a mano (ver `AGENTS.md`/`CLAUDE.md` § A9); `android.versionCode`/`ios.buildNumber` de `app.json` son contadores de build independientes del SemVer y no se tocan en un bump de versión.
+- El trabajo del día a día se hace en `feature/*`/`fix/*`, nunca directo sobre `main`/`dev` — ver `AGENTS.md` sección "Branching". Al mergear a `dev` o `main`, recordar (no ejecutar solo) si corresponde bumpear versión.
+- **El merge nunca es automático** — después de commitear y pushear una rama, parar y mostrar un resumen del cambio antes de ejecutar `git merge`, esperando confirmación explícita. Nunca encadenar commit → push → merge sin que el usuario vea qué se integra a `dev`/`main`.
 
-Detalle completo en `.rocky-spec/reference/versioning.md` de la skill.
+Detalle completo, ejemplos y la relación con los snapshots de `specs/` en `.rocky-spec/reference/versioning.md` de la skill.
 
 ## Artículo 8 — Gestión de dependencias
 
@@ -105,6 +109,7 @@ Excepciones explícitas a algún artículo de arriba, acordadas para este proyec
 
 ## Historial de enmiendas
 
-| Fecha | Versión | Cambio | Motivo |
-|-------|---------|--------|--------|
-| 2026-09-11 | 1.0.0 | Ratificación inicial | Generado al cerrar el drift de adopción (gate de Reanudación, `mode-resume.md`) |
+| Fecha      | Versión | Cambio               | Motivo                                                                          |
+| ---------- | ------- | -------------------- | ------------------------------------------------------------------------------- |
+| 2026-09-11 | 1.0.0   | Ratificación inicial | Generado al cerrar el drift de adopción (gate de Reanudación, `mode-resume.md`) |
+| 2026-09-12 | 1.0.1   | Aclaración de redacción (reformateo de tablas, Artículo 7 corregido) | Un auto-update de la skill había introducido en el Artículo 7 una afirmación incorrecta para este proyecto ("la versión vive en un solo lugar") y una regla irrelevante sobre distribución vía npm/PyPI — corregido para reflejar que la versión sigue en `package.json`/`app.json` (§ A9) |
