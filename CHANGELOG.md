@@ -9,13 +9,21 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 ## [Unreleased]
 
 ### Added
-- `ErrorBoundary` en el layout raíz y en `(main)`, con fallback compartido y botón de reintentar — antes un error de render dejaba la app en blanco (A4)
 
 ### Changed
 
 ### Deprecated
 
 ### Removed
+
+### Fixed
+
+### Security
+
+## [1.1.0] - 2026-09-12
+
+### Added
+- `ErrorBoundary` en el layout raíz y en `(main)`, con fallback compartido y botón de reintentar — antes un error de render dejaba la app en blanco (A4)
 
 ### Fixed
 - Prestatario podía marcar sus propias cuotas como pagadas — cerrado con RLS (S1)
@@ -38,6 +46,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 ### Security
 - Dump y sincronización del schema real de Supabase con `supabase/migrations/`, que estaba desactualizado (S3)
 - API key de RevenueCat hardcodeada en el código fuente — movida a `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `_ANDROID_KEY` en `.env` (S5)
+
+> Primer release taggeado en git del proyecto (`v1.1.0`). La versión pasa de `1.0.3` a `1.1.0` (MINOR) por el `Added` de A4.
 
 ## [1.0.2] - 2026-08-10 (pre-launch, sin tag de git)
 
