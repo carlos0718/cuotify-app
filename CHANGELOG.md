@@ -33,6 +33,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 - `database.types.ts` estaba desactualizado a mano: le faltaban las tablas `personal_debts`, `debt_payments` y `notification_preferences` — regenerado contra el schema real, lo que sacó 27 `as never`/`as any` que ya no hacían falta en `loans.ts`, `personalDebts.ts`, `notificationPreferences.ts` y `loans/analyze.tsx` (A7)
 - `.update()` en `settings/profile.tsx` fallaba contra los tipos regenerados (`profile?.id` como `string | undefined`) — se agregó un guard `if (!profile) return` (L17)
 - `package.json` (1.0.2) y `app.json` (1.0.1) desincronizados — unificados a 1.0.3 (A9)
+- `react-native-worklets-core` (sin un solo import en el código) rompía cualquier build de Android por incompatibilidad de su CMake con el NDK/Hermes del SDK 57 — eliminado de `package.json` (A10)
 
 ### Security
 - Dump y sincronización del schema real de Supabase con `supabase/migrations/`, que estaba desactualizado (S3)

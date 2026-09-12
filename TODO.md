@@ -153,6 +153,7 @@
       por moneda
 - [x] **L1 (resto)** Pasar la moneda en `loans/[id].tsx` (2 formatters) y
       `calendar/index.tsx` — hoy hardcodean ARS y muestran los préstamos en USD como pesos
+- [x] **A10** `react-native-worklets-core` sin usar rompía todo build de Android — sacado de `package.json`
 
 # 🟠 Bloque 2 — Requisitos de launch
 
