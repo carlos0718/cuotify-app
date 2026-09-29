@@ -188,13 +188,22 @@
 - [ ] **L6** Unificar el cálculo duplicado TS / PL/pgSQL *(A3 ya está listo, queda pendiente)*
 - [ ] **A11** Backfill de tests por capas (decisión 2026-09-29, ver `AGENTS.md` § Decisiones del setup)
       — orden: lógica pura (A3, listo) → ~~`utils/validators.ts`/`loanColors.ts`~~ (listo, 30 tests) →
-      `services/supabase/*.ts` (mockeando con msw, infra lista — falta cubrir `loans.ts` más allá de
-      prestatarios, `personalDebts.ts`, `auth.ts`, `export.ts`) → `store/*.ts` (Zustand) →
+      `services/supabase/*.ts` (mockeando con msw, infra lista) → `store/*.ts` (Zustand) →
       `components/ui/`. TDD estricto (test-first) para todo lo nuevo que se toque a partir de acá;
       las pantallas de `src/app/` quedan para el final por el costo de mockear navegación/Supabase
       — infra de test agregada: `jest.config.js` con proyectos `app`/`logic` (Node, para que
       `msw/node` pueda interceptar los fetch de supabase-js), `babel.config.js` (faltaba, lo
-      necesita el preset `jest-expo/node`), `src/test/msw/` (server + wiring), `src/test/setupEnv.js`
+      necesita el preset `jest-expo/node`), `src/test/msw/` (server + wiring), `src/test/setupEnv.js`.
+      `services/supabase/loans.ts` (903 líneas): cubierto — prestatarios (dedup por DNI/teléfono),
+      `markPaymentAsPaid`/`revertPaymentToPending` (auto-transición de estado), `deleteLoan` (guard
+      "solo completados"), `getActiveLoans` (regresión L4), `getNextPendingPaymentDatesByLoan`,
+      `getLoanStats`/`getLinkedLoanPaymentStats` (separación por moneda), `updatePaymentPenalty`/
+      `updateLoanPenalties` (33 tests en `loans.test.ts` + `loans.payments.test.ts`). Quedan sin
+      cubrir los passthroughs simples (`createLoan`, `getLoans`, `getLinkedLoans`, `getLoanById`,
+      `updateLoanStatus`, `addBorrowerComment`, `getUpcomingPayments`, `getOverduePayments`,
+      `getLastLoanColor`, `updateAllLoanColors`, `getAllPaymentsForExport`,
+      `getMonthlyInterestEarned`) — bajo ROI relativo, quedan para cuando se toquen. Falta
+      `personalDebts.ts` (518 líneas), `auth.ts`, `export.ts`
 - [x] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
 - [x] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [x] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
