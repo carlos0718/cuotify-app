@@ -61,6 +61,8 @@ export function PasswordInput({
         style={styles.toggleButton}
         onPress={toggleVisibility}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        accessibilityRole="button"
+        accessibilityLabel={isVisible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
       >
         {isVisible ? (
           <EyeOffIcon color={colors.text.secondary} />

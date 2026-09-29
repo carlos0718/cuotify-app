@@ -18,6 +18,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 ### Removed
 
 ### Fixed
+- Botón de mostrar/ocultar contraseña en `PasswordInput` sin `accessibilityLabel` ni `accessibilityRole` — un ícono SVG sin texto era invisible para VoiceOver/TalkBack (avance parcial de U1)
 
 ### Security
 
