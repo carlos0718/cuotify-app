@@ -153,11 +153,11 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - ✅ Edición de perfil (nombre, DNI, teléfono, rol)
 - ✅ Bloqueo biométrico de la app (`expo-local-authentication`)
 - ⏳ Login social (Google / Apple) — requisito de App Store si se agrega otro social
-- ⏳ Eliminación de cuenta (requisito de Google Play y GDPR) — flujo: reautenticación
-  con contraseña → confirmación explícita → Edge Function `delete-account` borra los
+- ✅ Eliminación de cuenta (requisito de Google Play y GDPR) — reautenticación con
+  contraseña → confirmación explícita → Edge Function `delete-account` borra los
   objetos del usuario en Storage y llama `auth.admin.deleteUser`, que cascadea el
   borrado del resto de las tablas por las FKs `ON DELETE CASCADE` ya existentes
-  (ver § 5.9)
+  (ver § 5.9). Falta publicar la política de privacidad en una URL pública (ver § 8, R8)
 - ⏳ Export de datos personales (portabilidad GDPR) — fuera de alcance de este cambio,
   queda pendiente aparte
 
@@ -281,6 +281,10 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - [x] El usuario free ve el paywall al intentar crear el 4° préstamo activo
 - [x] El cronograma se puede exportar a PDF y compartir (Pro)
 - [x] La app se puede bloquear con biometría
+- [x] Un usuario puede eliminar su cuenta; sus préstamos, deudas, cuotas,
+      notificaciones y comprobantes se borran en cascada
+- [x] La eliminación de cuenta exige reautenticación con contraseña y una
+      confirmación explícita antes de ejecutarse
 
 ### Abiertos
 - [ ] Un prestatario vinculado **no puede** modificar el estado de sus propias cuotas
@@ -292,10 +296,6 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - [ ] Las pantallas principales son navegables con lector de pantalla
 - [ ] Un crash en cualquier pantalla no deja la app en blanco (ErrorBoundary)
 - [ ] `supabase/migrations/` reproduce exactamente el schema de producción
-- [ ] Un usuario puede eliminar su cuenta; sus préstamos, deudas, cuotas,
-      notificaciones y comprobantes se borran en cascada
-- [ ] La eliminación de cuenta exige reautenticación con contraseña y una
-      confirmación explícita antes de ejecutarse
 
 ---
 

@@ -147,6 +147,18 @@ export async function updatePassword(newPassword: string) {
   }
 }
 
+// Eliminar la cuenta del usuario actual (borra Storage y cascadea el resto
+// de las tablas vía la Edge Function delete-account)
+export async function deleteAccount() {
+  try {
+    const { data, error } = await supabase.functions.invoke('delete-account');
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+  } catch (error) {
+    throw new Error(handleSupabaseError(error));
+  }
+}
+
 // Escuchar cambios en la sesión
 export function onAuthStateChange(
   callback: (event: string, session: Session | null) => void

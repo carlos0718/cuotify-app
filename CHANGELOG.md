@@ -9,6 +9,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 ## [Unreleased]
 
 ### Added
+- Eliminación de cuenta desde Ajustes → Seguridad → Zona de peligro: reautenticación con contraseña, doble confirmación y Edge Function `delete-account` que borra los comprobantes del usuario en Storage y llama `auth.admin.deleteUser`, cascadeando el resto de sus datos (S8)
 
 ### Changed
 
