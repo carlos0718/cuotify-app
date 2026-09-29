@@ -11,6 +11,7 @@ const asyncStorageMock = {
     '@react-native-async-storage/async-storage/jest/async-storage-mock',
 };
 
+
 // En el proyecto "logic" (entorno Node) no hay runtime de React Native, así
 // que el polyfill de URL de RN no aplica — Node ya trae URL/URLSearchParams.
 const logicModuleNameMapper = {
@@ -24,6 +25,7 @@ module.exports = {
       displayName: 'app',
       preset: 'jest-expo',
       setupFiles: ['<rootDir>/src/test/setupEnv.js'],
+      setupFilesAfterEnv: ['<rootDir>/src/test/setupReactNativeMocks.ts'],
       moduleNameMapper: asyncStorageMock,
       testMatch: [
         '<rootDir>/src/services/calculations/**/__tests__/**/*.test.ts',
