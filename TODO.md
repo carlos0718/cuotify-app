@@ -181,9 +181,16 @@
 
 # 🟠 Bloque 3 — Red de seguridad
 
-- [ ] **A3** Tests unitarios de `loanCalculator.ts` (simple, francés, mora, bordes)
+- [x] **A3** Tests unitarios de `loanCalculator.ts` (simple, francés, mora, bordes) — 35 tests en
+      `src/services/calculations/__tests__/loanCalculator.test.ts`, cubre los dos sistemas de
+      interés, cronograma de amortización, mora (fija/diaria/semanal/gracia) y bordes de redondeo
 - [x] **A8** ESLint + typecheck (`npx expo lint` + `tsc --noEmit`) — falta todavía el CI en GitHub Actions, ver `## Setup`
-- [ ] **L6** Unificar el cálculo duplicado TS / PL/pgSQL *(hacer con A3 ya listo)*
+- [ ] **L6** Unificar el cálculo duplicado TS / PL/pgSQL *(A3 ya está listo, queda pendiente)*
+- [ ] **A11** Backfill de tests por capas (decisión 2026-09-29, ver `AGENTS.md` § Decisiones del setup)
+      — orden: lógica pura (A3, listo) → `utils/validators.ts`/`loanColors.ts` → `services/supabase/*.ts`
+      (mockeando el client) → `store/*.ts` (Zustand) → `components/ui/`. TDD estricto (test-first)
+      para todo lo nuevo que se toque a partir de acá; las pantallas de `src/app/` quedan para el final
+      por el costo de mockear navegación/Supabase
 - [x] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
 - [x] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [x] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`

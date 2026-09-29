@@ -67,8 +67,9 @@ Cuando trabajes en este proyecto, asumí estos perfiles según el contexto del p
 - No aplica — app móvil, no se containeriza.
 
 ### Testing
-- Sin testing configurado hoy (ver `AGENTS.md` § Decisiones del setup — decisión explícita: no TDD, tests después de implementar).
-- Cuando se agreguen: unit para `loanCalculator.ts` (money math no se verifica a mano), integration para servicios de Supabase.
+- TDD adoptado el 2026-09-29 (ver `AGENTS.md` § Decisiones del setup y § A11 del `TODO.md`). Jest (`jest-expo`) configurado con CI.
+- Backfill por capas: lógica pura (`loanCalculator.ts`, listo — A3) → `utils/` → `services/supabase/` (mockeado) → `store/` → `components/ui/` → pantallas críticas.
+- Código nuevo o fix no trivial: test-first (red-green-refactor).
 
 ### Regla cruzada
 Cuando una feature toca varios roles (ej. agregar recordatorios de pago):
