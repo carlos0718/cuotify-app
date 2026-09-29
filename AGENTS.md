@@ -123,7 +123,12 @@ Each loan gets a pastel `color_code` from the `colors.loanColors` palette (`src/
 > El **qué** se eligió (stack, arquitectura) está arriba. Acá va el **por qué**.
 
 - **Arquitectura**: Layer-based (por capa técnica, no por feature) — la app tiene ~14 pantallas sobre dos dominios paralelos (préstamos/deudas) que comparten casi toda su infraestructura (un cliente Supabase, un motor de cálculo, un theme); feature-based hubiera duplicado ese plumbing. Ver el trade-off que esto paga hoy (extracción a `components/<feature>/`/`hooks/` incompleta) en la sección "Architecture — Layer-based" más abajo.
-- **TDD**: No — no hay tests configurados; se prioriza shippear el MVP y agregar tests a `loanCalculator.ts` cuando el cálculo de intereses/penalidades se toque (ver Testing en `TODO.md` § Calidad).
+- **TDD**: Sí, adoptado el 2026-09-29 (§ A11 del `TODO.md`) — Jest (`jest-expo`) ya estaba configurado
+  con CI en `.github/workflows/ci.yml`. El backfill de tests para código existente va por capas,
+  de adentro hacia afuera: lógica pura (`services/calculations/`, ya cubierto — A3) → `utils/` →
+  `services/supabase/` (mockeando el client) → `store/` (Zustand) → `components/ui/` → pantallas
+  críticas de `src/app/`. De acá en adelante, toda feature nueva o fix no trivial se escribe
+  test-first (red-green-refactor), no solo el backfill de lo ya existente.
 - **Versión desincronizada**: la versión del proyecto vive en dos lugares (`package.json` y `app.json`) y hoy están desalineados — unificarlos es la tarea § A9 del `TODO.md`.
 - **Licencia**: propietaria (ver `LICENSE`) — software privado, no se redistribuye.
 
