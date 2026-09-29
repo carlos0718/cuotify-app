@@ -213,7 +213,12 @@
       passthroughs simples (`getPersonalDebts`, `getActivePersonalDebts`, `getPersonalDebtById`,
       `updateDebtStatus`, `updateDebtColor`, `getDebtPayments`, `markDebtPaymentAsPaid`,
       `revertDebtPaymentToPending`, `getUpcomingDebtPayments`, `getAllDebtPaymentsForExport`).
-      Falta `auth.ts`, `export.ts`
+      `services/supabase/auth.ts` (168 líneas): cubierto completo — 24 tests (`auth.test.ts`).
+      Notas: `supabase.functions` es un getter que crea un `FunctionsClient` nuevo en cada
+      acceso, no se puede mockear `.invoke` sobre una instancia ya obtenida — hay que mockear
+      el getter (`jest.spyOn(supabase, 'functions', 'get')`); `deleteAccount` tiene dos caminos
+      de error distintos (falla la invocación vs. la Edge Function responde 200 con `data.error`).
+      Falta `export.ts`
 - [x] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
 - [x] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [x] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
