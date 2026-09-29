@@ -5,6 +5,7 @@ import {
   signIn as authSignIn,
   signUp as authSignUp,
   signOut as authSignOut,
+  deleteAccount as authDeleteAccount,
   getSession,
   getCurrentProfile,
   onAuthStateChange,
@@ -26,6 +27,7 @@ interface AuthState {
   signIn: (data: SignInData) => Promise<void>;
   signUp: (data: SignUpData) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   clearError: () => void;
 
@@ -167,6 +169,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Error al cerrar sesión',
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
+  // Eliminar la cuenta del usuario actual (irreversible)
+  deleteAccount: async () => {
+    try {
+      set({ isLoading: true, error: null });
+
+      await authDeleteAccount();
+
+      set({
+        user: null,
+        session: null,
+        profile: null,
+        isLoading: false,
+      });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Error al eliminar la cuenta',
         isLoading: false,
       });
       throw error;

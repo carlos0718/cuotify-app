@@ -153,7 +153,13 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - ✅ Edición de perfil (nombre, DNI, teléfono, rol)
 - ✅ Bloqueo biométrico de la app (`expo-local-authentication`)
 - ⏳ Login social (Google / Apple) — requisito de App Store si se agrega otro social
-- ⏳ Eliminación de cuenta y export de datos (requisito de Google Play y GDPR)
+- ✅ Eliminación de cuenta (requisito de Google Play y GDPR) — reautenticación con
+  contraseña → confirmación explícita → Edge Function `delete-account` borra los
+  objetos del usuario en Storage y llama `auth.admin.deleteUser`, que cascadea el
+  borrado del resto de las tablas por las FKs `ON DELETE CASCADE` ya existentes
+  (ver § 5.9). Falta publicar la política de privacidad en una URL pública (ver § 8, R8)
+- ⏳ Export de datos personales (portabilidad GDPR) — fuera de alcance de este cambio,
+  queda pendiente aparte
 
 ### 5.2 Préstamos (rol prestamista)
 - ✅ Alta en 3 pasos: datos del prestatario → condiciones → mora y preview
@@ -243,6 +249,7 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 | `analyze-loans-document` | Edge Function (Deno) | `supabase/functions/analyze-loans-document/` | Importación de préstamos en lote con Gemini (§ 5.2) |
 | `analyze-credit-card` | Edge Function (Deno) | `supabase/functions/analyze-credit-card/` | Import de resumen de tarjeta con IA (§ 5.3) |
 | `send-payment-reminders` | Edge Function (Deno) | `supabase/functions/send-payment-reminders/` | Envío server-side de recordatorios (§ 5.5) — sin cron automático todavía |
+| `delete-account` | Edge Function (Deno) | `supabase/functions/delete-account/` | Botón "Eliminar cuenta" en Ajustes → Seguridad (§ 5.1) — verifica el JWT del usuario, borra sus objetos en Storage y llama `auth.admin.deleteUser` |
 
 ---
 
@@ -274,6 +281,10 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - [x] El usuario free ve el paywall al intentar crear el 4° préstamo activo
 - [x] El cronograma se puede exportar a PDF y compartir (Pro)
 - [x] La app se puede bloquear con biometría
+- [x] Un usuario puede eliminar su cuenta; sus préstamos, deudas, cuotas,
+      notificaciones y comprobantes se borran en cascada
+- [x] La eliminación de cuenta exige reautenticación con contraseña y una
+      confirmación explícita antes de ejecutarse
 
 ### Abiertos
 - [ ] Un prestatario vinculado **no puede** modificar el estado de sus propias cuotas
@@ -299,7 +310,7 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 | R5 | **Suma de monedas**: ARS y USD se agregan en el mismo total sin conversión | Medio | Abierto |
 | R6 | **Sin tests**: toda la lógica financiera (interés, amortización, mora) sin cobertura | Alto | Abierto |
 | R7 | **Duplicación de lógica**: el cálculo de cuotas existe en TS y en PL/pgSQL; pueden divergir | Medio | Abierto |
-| R8 | **Cumplimiento de stores**: falta eliminación de cuenta (Google Play) y política de privacidad publicada | Bloqueante para launch | Abierto |
+| R8 | **Cumplimiento de stores**: falta eliminación de cuenta (Google Play) y política de privacidad publicada | Bloqueante para launch | Eliminación de cuenta en desarrollo (§ 5.1); política de privacidad todavía sin URL pública (hoy solo existe como texto in-app en Ajustes) |
 
 > El análisis completo con ubicación exacta de cada hallazgo y su fix propuesto
 > está en **`docs/IMPROVEMENTS.md`**.
@@ -324,3 +335,4 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 |---|---|---|
 | 2026-08-10 | Adopción del proyecto con `rocky-spec` (entonces `charlydev-flow`) — SPEC reconstruido desde el código existente | — |
 | 2026-09-11 | `.rocky-spec` actualizado a v0.20.0 — SPEC.md, AGENTS.md, CLAUDE.md, OBSERVABILITY.md, CHANGELOG.md y TODO.md alineados al template vigente (drift de contenido resuelto) | — |
+| 2026-09-29 | Agregado el flujo de eliminación de cuenta al dominio (§ 5.1) y a los contratos de API (§ 5.9) — implementación en curso | S8 |

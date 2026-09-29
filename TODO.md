@@ -53,7 +53,8 @@
 - [x] Recuperación de contraseña por código OTP
 - [x] Edición de perfil
 - [x] Bloqueo biométrico
-- [ ] 🔴 Eliminación de cuenta + política de privacidad — **bloqueante de stores**, § S8
+- [x] 🔴 Eliminación de cuenta — § S8 (falta todavía publicar la política de
+      privacidad en una URL pública, ver Bloque 2)
 - [ ] Login con Google / Apple
 
 ## Préstamos
@@ -168,7 +169,8 @@
       recarga igual que siempre.
       Nota: el perfil `development` de `eas.json` no tiene bloque `env` (no hace
       falta: las `EXPO_PUBLIC_*` se inyectan al bundlear local desde `.env`).
-- [ ] **S8** Eliminación de cuenta + política de privacidad
+- [x] **S8** Eliminación de cuenta (falta publicar la política de privacidad en una
+      URL pública — sigue como pendiente separado, ver § Documentación)
 - [x] **A4** `ErrorBoundary` en los layouts raíz
 - [ ] **A5** Sentry para crash reporting
 - [x] **S5** Keys de RevenueCat fuera del código
@@ -247,6 +249,10 @@
 
 ## Documentación
 
+- [ ] 🔴 Publicar la política de privacidad en una URL pública — **bloqueante de
+      stores** (Google Play la exige en la ficha, y Apple la pide en App Store
+      Connect). Hoy solo existe como texto in-app en Ajustes. Falta decidir dónde
+      hostearla (GitHub Pages de este repo, Notion, u otra) — parte de § S8
 - [ ] Completar `README.md` con setup, features reales y estado del proyecto (README sync, ver `AGENTS.md`)
 - [ ] Revisar que las secciones nuevas de `AGENTS.md`/`CLAUDE.md` (agregadas al resolver el drift de contenido del 2026-09-11) no contradigan ninguna convención real del equipo
 - [ ] Agregar diagrama del modelo de dominio (`SPEC.md` § 4.2) como imagen, si se necesita para onboarding de alguien nuevo al proyecto
