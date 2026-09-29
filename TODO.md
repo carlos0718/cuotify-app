@@ -218,7 +218,12 @@
       acceso, no se puede mockear `.invoke` sobre una instancia ya obtenida — hay que mockear
       el getter (`jest.spyOn(supabase, 'functions', 'get')`); `deleteAccount` tiene dos caminos
       de error distintos (falla la invocación vs. la Edge Function responde 200 con `data.error`).
-      Falta `export.ts`
+      `services/supabase/export.ts`: cubierto completo — 7 tests (`export.test.ts`), mockeando
+      `../loans`/`../personalDebts` con `jest.mock()` (no hace falta msw acá, no habla con
+      Supabase directo) y `expo-file-system`/`expo-sharing`. Cubre armado de columnas, mapeo de
+      prestatario/preéstamo por id, defaults de `null`, y el escaping de CSV (comas/comillas).
+      **`services/supabase/` queda 100% cubierto** (144 tests en total del proyecto). Sigue
+      `store/*.ts` (Zustand) → `components/ui/` → pantallas críticas
 - [x] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
 - [x] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [x] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
