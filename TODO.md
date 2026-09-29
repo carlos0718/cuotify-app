@@ -202,8 +202,18 @@
       cubrir los passthroughs simples (`createLoan`, `getLoans`, `getLinkedLoans`, `getLoanById`,
       `updateLoanStatus`, `addBorrowerComment`, `getUpcomingPayments`, `getOverduePayments`,
       `getLastLoanColor`, `updateAllLoanColors`, `getAllPaymentsForExport`,
-      `getMonthlyInterestEarned`) — bajo ROI relativo, quedan para cuando se toquen. Falta
-      `personalDebts.ts` (518 líneas), `auth.ts`, `export.ts`
+      `getMonthlyInterestEarned`) — bajo ROI relativo, quedan para cuando se toquen.
+      `services/supabase/personalDebts.ts` (518 líneas): cubierto — `createPersonalDebt` (cálculo
+      simple/francés, nota: acá `interest_rate` se trata como tasa del período y no anual, a
+      diferencia de `loanCalculator.ts` — confirma por qué existe L6; y el rollback si falla la
+      RPC del cronograma), `deletePersonalDebt` (guard "no activa"), `getDebtStats` (regresión:
+      solo cuenta pagos de deudas activas, separado por moneda), `getOverdueDebtPayments`
+      (side-effect de marcar `overdue` + skip si no hay vencidos), `getDebtPaidAmounts`,
+      `getNextPendingPaymentDates` (15 tests en `personalDebts.test.ts`). Quedan sin cubrir los
+      passthroughs simples (`getPersonalDebts`, `getActivePersonalDebts`, `getPersonalDebtById`,
+      `updateDebtStatus`, `updateDebtColor`, `getDebtPayments`, `markDebtPaymentAsPaid`,
+      `revertDebtPaymentToPending`, `getUpcomingDebtPayments`, `getAllDebtPaymentsForExport`).
+      Falta `auth.ts`, `export.ts`
 - [x] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
 - [x] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [x] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
