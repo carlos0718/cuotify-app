@@ -231,7 +231,29 @@
       `subscriptionStore.test.ts`) — **178 tests en total del proyecto**. Nota: mockear
       `services/subscription` necesita una factory explícita en `jest.mock()` — el automock
       default igual `require()`ea `react-native-purchases` (módulo nativo) para inspeccionar su
-      forma, y eso rompe fuera de un runtime RN. Sigue `components/ui/` → pantallas críticas
+      forma, y eso rompe fuera de un runtime RN.
+      `components/ui/`: cubierto completo — `Modal.tsx` (visibilidad, botones default/custom,
+      estilos cancel/primary/destructive, cierre automático vs. callback propio, children),
+      `Toast.tsx` (render por tipo, ícono/mensaje, auto-hide por `duration`, hide manual al
+      tocar la pill), `ToastProvider.tsx`/`useToast` (los 4 show* + showToast genérico,
+      reemplazo del toast anterior en vez de apilar, hideToast, error si se usa `useToast` fuera
+      del provider), `PasswordInput.tsx` (toggle mostrar/ocultar, autoCapitalize/autoCorrect
+      forzados, passthrough de props), `PhoneInput.tsx` (país/label por defecto, cálculo de
+      E.164, validación del check ✓, picker de país con búsqueda por nombre/dial code,
+      selección y cierre), `ErrorFallback.tsx` (mensaje genérico, detalle técnico solo en
+      `__DEV__`, callback `retry`). 44 tests nuevos (`Modal.test.tsx` + `Toast.test.tsx` +
+      `ToastProvider.test.tsx` + `PasswordInput.test.tsx` + `PhoneInput.test.tsx` +
+      `ErrorFallback.test.tsx`) — **222 tests en total del proyecto**. Infra agregada:
+      `@testing-library/react-native` 14.0.1
+      + `test-renderer` 1.3.0 (dev deps; en v14 `render`/`rerender`/`fireEvent.*` son
+      `async`, hay que `await`-earlos), mock de `react-native-safe-area-context` vía
+      `jest.mock()` en `src/test/setupReactNativeMocks.ts` (con `moduleNameMapper` el propio
+      `jest.requireActual` del mock oficial de la librería quedaba atrapado en el mismo mock).
+      Se agregó `accessibilityRole`/`accessibilityLabel` al botón de mostrar/ocultar contraseña
+      en `PasswordInput.tsx` (antes un ícono SVG sin ningún texto ni label accesible) — hacía
+      falta para poder testearlo con las queries accesibles de RTL v14 (que sacó las queries
+      `UNSAFE_*`), y de paso cierra un gap real de accesibilidad para VoiceOver/TalkBack.
+      Sigue: pantallas críticas de `src/app/`
 - [x] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
 - [x] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [x] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
