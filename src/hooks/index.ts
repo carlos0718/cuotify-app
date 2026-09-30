@@ -24,4 +24,6 @@ export { useNotificationsList } from './useNotificationsList';
 export type { AppNotification, NotificationType } from './useNotificationsList';
 export { useDebtsList } from './useDebtsList';
 export type { LinkedLoan, DebtsListFilter } from './useDebtsList';
+export { useDebtAnalyze } from './useDebtAnalyze';
+export type { DebtAnalyzePhase, EditableDebtItem } from './useDebtAnalyze';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
