@@ -22,4 +22,6 @@ export { useCalendarData } from './useCalendarData';
 export type { CalendarPaymentItem } from './useCalendarData';
 export { useNotificationsList } from './useNotificationsList';
 export type { AppNotification, NotificationType } from './useNotificationsList';
+export { useDebtsList } from './useDebtsList';
+export type { LinkedLoan, DebtsListFilter } from './useDebtsList';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
