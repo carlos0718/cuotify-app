@@ -28,4 +28,5 @@ export { useDebtAnalyze } from './useDebtAnalyze';
 export type { DebtAnalyzePhase, EditableDebtItem } from './useDebtAnalyze';
 export { useDebtDetail } from './useDebtDetail';
 export type { DebtPaymentStatus, SelectedDebtPayment } from './useDebtDetail';
+export { useCreateDebtForm } from './useCreateDebtForm';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
