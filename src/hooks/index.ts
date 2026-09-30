@@ -12,4 +12,5 @@ export { useProfileForm } from './useProfileForm';
 export { useNotificationSettings } from './useNotificationSettings';
 export { usePremiumScreen } from './usePremiumScreen';
 export { useCustomPaywall } from './useCustomPaywall';
+export { useSettingsHome, SUPPORT_EMAIL } from './useSettingsHome';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
