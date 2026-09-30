@@ -10,4 +10,6 @@ export { useResetPasswordForm } from './useResetPasswordForm';
 export { useDeleteAccountForm } from './useDeleteAccountForm';
 export { useProfileForm } from './useProfileForm';
 export { useNotificationSettings } from './useNotificationSettings';
+export { usePremiumScreen } from './usePremiumScreen';
+export { useCustomPaywall } from './useCustomPaywall';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
