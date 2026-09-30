@@ -4,4 +4,5 @@ export { useLoanDetail } from './useLoanDetail';
 export { useDashboardData, formatShortCurrency } from './useDashboardData';
 export type { LoanWithBorrower, PaymentWithLoan } from './useDashboardData';
 export { useCreateLoanForm } from './useCreateLoanForm';
+export { useCustomerCenter } from './useCustomerCenter';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
