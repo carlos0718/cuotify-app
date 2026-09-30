@@ -16,4 +16,6 @@ export { useSettingsHome, SUPPORT_EMAIL } from './useSettingsHome';
 export { useLoansList } from './useLoansList';
 export type { LoanListItem, LoansListFilter } from './useLoansList';
 export { useLoanLink } from './useLoanLink';
+export { useLoanAnalyze } from './useLoanAnalyze';
+export type { LoanAnalyzePhase, EditableLoanItem } from './useLoanAnalyze';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
