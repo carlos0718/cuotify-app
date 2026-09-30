@@ -20,4 +20,6 @@ export { useLoanAnalyze } from './useLoanAnalyze';
 export type { LoanAnalyzePhase, EditableLoanItem } from './useLoanAnalyze';
 export { useCalendarData } from './useCalendarData';
 export type { CalendarPaymentItem } from './useCalendarData';
+export { useNotificationsList } from './useNotificationsList';
+export type { AppNotification, NotificationType } from './useNotificationsList';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
