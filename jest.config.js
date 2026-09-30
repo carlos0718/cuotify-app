@@ -31,6 +31,7 @@ module.exports = {
         '<rootDir>/src/services/calculations/**/__tests__/**/*.test.ts',
         '<rootDir>/src/utils/**/__tests__/**/*.test.ts',
         '<rootDir>/src/components/**/__tests__/**/*.test.tsx',
+        '<rootDir>/src/hooks/**/__tests__/**/*.test.{ts,tsx}',
         '<rootDir>/src/app/**/__tests__/**/*.test.tsx',
       ],
     },
