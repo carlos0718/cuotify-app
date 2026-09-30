@@ -6,4 +6,5 @@ export type { LoanWithBorrower, PaymentWithLoan } from './useDashboardData';
 export { useCreateLoanForm } from './useCreateLoanForm';
 export { useCustomerCenter } from './useCustomerCenter';
 export { useForgotPasswordForm } from './useForgotPasswordForm';
+export { useResetPasswordForm } from './useResetPasswordForm';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
