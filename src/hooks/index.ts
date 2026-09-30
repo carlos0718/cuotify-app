@@ -18,4 +18,6 @@ export type { LoanListItem, LoansListFilter } from './useLoansList';
 export { useLoanLink } from './useLoanLink';
 export { useLoanAnalyze } from './useLoanAnalyze';
 export type { LoanAnalyzePhase, EditableLoanItem } from './useLoanAnalyze';
+export { useCalendarData } from './useCalendarData';
+export type { CalendarPaymentItem } from './useCalendarData';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
