@@ -263,9 +263,25 @@
       services/notifications, services/pdf y expo-image-picker), incluyendo el camino feliz y
       de error de `handleCreate`/`confirmDeleteLoan`, el gate de premium por límite del plan
       free, y los dos fallos "best effort" que no bloquean la creación del préstamo
-      (comprobante, notificaciones). **301 tests en total del proyecto.** Con esto se completa
-      A11 para las capas y pantallas acordadas — queda pendiente el resto de las pantallas de
-      `src/app/` si se decide ampliar el backfill más adelante (no forma parte de esta tarea).
+      (comprobante, notificaciones). **301 tests en total del proyecto.**
+      Resto de pantallas de `src/app/` (ampliación posterior, mismo día): se extendió el
+      backfill al resto de pantallas con lógica real — `settings/customer-center.tsx`,
+      `(auth)/forgot-password.tsx`, `(auth)/reset-password.tsx`,
+      `settings/delete-account.tsx`, `settings/profile.tsx`, `settings/notifications.tsx`,
+      `settings/premium.tsx` (2 hooks: paywall nativo vs. custom para Expo Go),
+      `settings/index.tsx`, `loans/index.tsx`, `loans/link.tsx`, `loans/analyze.tsx`,
+      `calendar/index.tsx`, `notifications/index.tsx`, `debts/index.tsx`,
+      `debts/analyze.tsx`, `debts/[id].tsx`, `debts/create.tsx`, y `src/app/_layout.tsx`
+      (init de auth/RevenueCat/push, `useAppBootstrap`) — 17 hooks nuevos, 165 tests nuevos.
+      Se saltearon a propósito por no tener lógica real que extraer (solo redirect de auth o
+      placeholder estático): `src/app/index.tsx`, `(main)/_layout.tsx`,
+      `(main)/settings/security.tsx`, `(main)/borrowers/index.tsx`.
+      De paso, un fix real: `useCustomerCenter` llamaba `openCustomerCenter()` sin `await` ni
+      `.catch()` en el `useEffect` — el `finally` ya garantizaba el `router.back()`, pero el
+      reject de `presentCustomerCenter` quedaba como unhandled promise rejection.
+      **466 tests en total del proyecto.** Con esto A11 queda completo para todas las
+      pantallas de `src/app/` que tenían lógica propia — no queda nada pendiente de este
+      backfill.
 - [x] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
 - [x] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [x] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`

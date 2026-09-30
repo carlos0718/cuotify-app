@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import {
   View,
   Text,
@@ -6,29 +6,15 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Dimensions,
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Constants from 'expo-constants';
-import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
-import { PurchasesPackage } from 'react-native-purchases';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
-import {
-  getAvailablePackages,
-  purchasePackage,
-  restorePurchases,
-  isPremium,
-} from '../../../services/subscription';
-import { useSubscriptionStore } from '../../../store';
-import { useToast } from '../../../components';
+import { usePremiumScreen, useCustomPaywall } from '../../../hooks';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// En Expo Go el Paywall nativo no funciona — usamos el custom
-const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
 const SLIDES = [
   {
@@ -58,37 +44,7 @@ const SLIDES = [
 ];
 
 export default function PremiumScreen() {
-  const { setPremium } = useSubscriptionStore();
-
-  const presentNativePaywall = async () => {
-    try {
-      const result = await RevenueCatUI.presentPaywallIfNeeded({
-        requiredEntitlementIdentifier: 'Cuotify Pro',
-      });
-      switch (result) {
-        case PAYWALL_RESULT.PURCHASED:
-        case PAYWALL_RESULT.RESTORED:
-          const active = await isPremium();
-          setPremium(active);
-          router.back();
-          break;
-        case PAYWALL_RESULT.NOT_PRESENTED:
-          router.back();
-          break;
-        default:
-          router.back();
-          break;
-      }
-    } catch {
-      router.back();
-    }
-  };
-
-  useEffect(() => {
-    if (!isExpoGo) {
-      presentNativePaywall();
-    }
-  }, []);
+  const { isExpoGo } = usePremiumScreen();
 
   if (!isExpoGo) {
     return (
@@ -100,75 +56,28 @@ export default function PremiumScreen() {
     );
   }
 
-  return <CustomPaywall setPremium={setPremium} />;
+  return <CustomPaywall />;
 }
 
 // ─────────────────────────────────────────────────────────
 // Paywall custom (solo para Expo Go / testing)
 // ─────────────────────────────────────────────────────────
-function CustomPaywall({ setPremium }: { setPremium: (v: boolean) => void }) {
-  const [packages, setPackages] = useState<PurchasesPackage[]>([]);
-  const [selected, setSelected] = useState<PurchasesPackage | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isPurchasing, setIsPurchasing] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
-  const [currentSlide, setCurrentSlide] = useState(0);
+function CustomPaywall() {
+  const {
+    packages,
+    selected,
+    setSelected,
+    isLoading,
+    isPurchasing,
+    isRestoring,
+    currentSlide,
+    annualPkg,
+    monthlyPkg,
+    handleScroll,
+    handlePurchase,
+    handleRestore,
+  } = useCustomPaywall();
   const slideRef = useRef<ScrollView>(null);
-  const { showSuccess, showError } = useToast();
-
-  useEffect(() => {
-    getAvailablePackages().then((pkgs) => {
-      setPackages(pkgs);
-      const annual = pkgs.find((p) => p.packageType === 'ANNUAL') ?? pkgs[0] ?? null;
-      setSelected(annual);
-      setIsLoading(false);
-    });
-  }, []);
-
-  const annualPkg = packages.find((p) => p.packageType === 'ANNUAL') ?? null;
-  const monthlyPkg = packages.find((p) => p.packageType === 'MONTHLY') ?? null;
-
-  const handleScroll = (e: { nativeEvent: { contentOffset: { x: number } } }) => {
-    const slide = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-    setCurrentSlide(slide);
-  };
-
-  const handlePurchase = async () => {
-    if (!selected) return;
-    setIsPurchasing(true);
-    try {
-      const result = await purchasePackage(selected);
-      if (result.success) {
-        setPremium(true);
-        showSuccess('¡Bienvenido a Cuotify Pro!', 'Ya tenés acceso a todas las funciones.');
-        router.back();
-      } else if (!result.userCancelled && result.error) {
-        showError('Error', result.error);
-      }
-    } catch {
-      showError('Error', 'No se pudo completar la compra.');
-    } finally {
-      setIsPurchasing(false);
-    }
-  };
-
-  const handleRestore = async () => {
-    setIsRestoring(true);
-    try {
-      const result = await restorePurchases();
-      if (result.success) {
-        setPremium(true);
-        showSuccess('Compra restaurada', 'Tu plan Pro fue reactivado.');
-        router.back();
-      } else {
-        Alert.alert('Sin compras previas', 'No encontramos una compra anterior para restaurar.');
-      }
-    } catch {
-      showError('Error', 'No se pudo restaurar la compra.');
-    } finally {
-      setIsRestoring(false);
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
