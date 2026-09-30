@@ -8,4 +8,5 @@ export { useCustomerCenter } from './useCustomerCenter';
 export { useForgotPasswordForm } from './useForgotPasswordForm';
 export { useResetPasswordForm } from './useResetPasswordForm';
 export { useDeleteAccountForm } from './useDeleteAccountForm';
+export { useProfileForm } from './useProfileForm';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
