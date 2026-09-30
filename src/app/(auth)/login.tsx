@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   View,
   Text,
@@ -12,44 +11,13 @@ import {
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link, router } from 'expo-router';
-import { useAuthStore } from '../../store';
+import { Link } from 'expo-router';
 import { colors, gradients, spacing, borderRadius, fontSize, fontWeight } from '../../theme';
-import { useToast, PasswordInput } from '../../components';
-import { validateEmail } from '../../utils';
+import { PasswordInput } from '../../components';
+import { useLoginForm } from '../../hooks';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  const { signIn, isLoading, clearError } = useAuthStore();
-  const { showError, showWarning } = useToast();
-
-  const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      showError('Error', 'Por favor completa todos los campos');
-      return;
-    }
-
-    // Validar email con detección de typos
-    const emailValidation = validateEmail(email);
-    if (!emailValidation.isValid) {
-      showError('Correo inválido', emailValidation.error || 'El correo no es válido');
-      return;
-    }
-    if (emailValidation.warning) {
-      showWarning('Revisá tu correo', emailValidation.warning);
-    }
-
-    try {
-      await signIn({ email: email.trim(), password });
-      router.replace('/(main)/dashboard');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'No se pudo iniciar sesión';
-      showError('Error', errorMessage);
-      clearError();
-    }
-  };
+  const { email, setEmail, password, setPassword, isLoading, handleLogin } = useLoginForm();
 
   return (
     <LinearGradient colors={gradients.primary} style={styles.container}>

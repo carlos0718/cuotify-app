@@ -186,7 +186,7 @@
       interés, cronograma de amortización, mora (fija/diaria/semanal/gracia) y bordes de redondeo
 - [x] **A8** ESLint + typecheck (`npx expo lint` + `tsc --noEmit`) — falta todavía el CI en GitHub Actions, ver `## Setup`
 - [ ] **L6** Unificar el cálculo duplicado TS / PL/pgSQL *(A3 ya está listo, queda pendiente)*
-- [ ] **A11** Backfill de tests por capas (decisión 2026-09-29, ver `AGENTS.md` § Decisiones del setup)
+- [x] **A11** Backfill de tests por capas (decisión 2026-09-29, ver `AGENTS.md` § Decisiones del setup)
       — orden: lógica pura (A3, listo) → ~~`utils/validators.ts`/`loanColors.ts`~~ (listo, 30 tests) →
       `services/supabase/*.ts` (mockeando con msw, infra lista) → `store/*.ts` (Zustand) →
       `components/ui/`. TDD estricto (test-first) para todo lo nuevo que se toque a partir de acá;
@@ -253,7 +253,19 @@
       en `PasswordInput.tsx` (antes un ícono SVG sin ningún texto ni label accesible) — hacía
       falta para poder testearlo con las queries accesibles de RTL v14 (que sacó las queries
       `UNSAFE_*`), y de paso cierra un gap real de accesibilidad para VoiceOver/TalkBack.
-      Sigue: pantallas críticas de `src/app/`
+      Pantallas críticas de `src/app/` (`(auth)/login.tsx`, `(auth)/register.tsx`,
+      `(main)/loans/[id].tsx`, `(main)/dashboard/index.tsx`, `(main)/loans/create.tsx`):
+      cubierto — la lógica de cada una (estado, validaciones, llamadas a Supabase, cálculos)
+      se extrajo a un hook propio en `src/hooks/` (`useLoginForm`, `useRegisterForm`,
+      `useLoanDetail`, `useDashboardData`, `useCreateLoanForm`), dejando la pantalla como JSX
+      puro — primer uso real de `src/hooks/` (estaba vacío desde el setup, A1). 79 tests
+      nuevos entre los 5 hooks (mockeando expo-router, los stores, services/supabase,
+      services/notifications, services/pdf y expo-image-picker), incluyendo el camino feliz y
+      de error de `handleCreate`/`confirmDeleteLoan`, el gate de premium por límite del plan
+      free, y los dos fallos "best effort" que no bloquean la creación del préstamo
+      (comprobante, notificaciones). **301 tests en total del proyecto.** Con esto se completa
+      A11 para las capas y pantallas acordadas — queda pendiente el resto de las pantallas de
+      `src/app/` si se decide ampliar el backfill más adelante (no forma parte de esta tarea).
 - [x] **L12** Clave duplicada en `validators.ts` y allowlist de TLDs que rechaza dominios válidos
 - [x] **L14** `onAuthStateChange` tipa la sesión como `unknown` — se filtra a `authStore.ts`
 - [x] **L15** `Modal` con `style: 'secondary'` inexistente en `loans/create.tsx:634`
