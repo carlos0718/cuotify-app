@@ -26,4 +26,6 @@ export { useDebtsList } from './useDebtsList';
 export type { LinkedLoan, DebtsListFilter } from './useDebtsList';
 export { useDebtAnalyze } from './useDebtAnalyze';
 export type { DebtAnalyzePhase, EditableDebtItem } from './useDebtAnalyze';
+export { useDebtDetail } from './useDebtDetail';
+export type { DebtPaymentStatus, SelectedDebtPayment } from './useDebtDetail';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
