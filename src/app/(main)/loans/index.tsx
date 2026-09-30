@@ -1,12 +1,9 @@
-import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { useAuthStore } from '../../../store';
-import { getLoans, getLoanStats, getNextPendingPaymentDatesByLoan } from '../../../services/supabase';
-import { LoanStats, emptyLoanStats } from '../../../services/supabase/loans';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
-import { Borrower } from '../../../types';
+import { useLoansList } from '../../../hooks';
 
 // Componente de tarjeta de préstamo
 function LoanListCard({
@@ -71,105 +68,24 @@ function LoanListCard({
   );
 }
 
-interface LoanWithBorrower {
-  id: string;
-  principal_amount: number;
-  total_amount: number;
-  status: 'active' | 'completed' | 'defaulted' | 'cancelled';
-  color_code: string;
-  currency: 'ARS' | 'USD';
-  first_payment_date: string;
-  borrower: Borrower | null;
-}
-
 export default function LoansScreen() {
   const { isLender } = useAuthStore();
-  const [loans, setLoans] = useState<LoanWithBorrower[]>([]);
-  const [stats, setStats] = useState<LoanStats>(emptyLoanStats());
-  const [nextPaymentDates, setNextPaymentDates] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const loadData = async () => {
-    try {
-      const [loansData, statsData] = await Promise.all([
-        getLoans(),
-        getLoanStats(),
-      ]);
-      setLoans(loansData as LoanWithBorrower[]);
-      setStats(statsData);
-      const activeIds = (loansData as LoanWithBorrower[]).filter(l => l.status === 'active').map(l => l.id);
-      const nextDates = await getNextPendingPaymentDatesByLoan(activeIds);
-      setNextPaymentDates(nextDates);
-    } catch (error) {
-      console.error('Error loading loans:', error);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  // Cargar datos cuando la pantalla recibe foco
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [])
-  );
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
-  };
-
-  const handleNewLoan = () => {
-    router.push('/(main)/loans/create');
-  };
-
-  const handleLinkLoan = () => {
-    router.push('/(main)/loans/link');
-  };
-
-  const filteredLoans = loans.filter(loan => {
-    const matchesFilter = filter === 'all' || loan.status === filter;
-    const matchesSearch = searchQuery.trim() === '' ||
-      loan.borrower?.full_name?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && (matchesSearch ?? true);
-  });
-
-  const formatCurrency = (amount: number, currency: 'ARS' | 'USD' = 'ARS') => {
-    if (currency === 'USD') {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 0,
-      }).format(amount);
-    }
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const getLoanStatus = (loan: LoanWithBorrower): 'active' | 'completed' | 'overdue' => {
-    if (loan.status === 'completed') return 'completed';
-    // Aquí podrías verificar si hay pagos vencidos
-    return 'active';
-  };
-
-  const getDueInfo = (loan: LoanWithBorrower): string => {
-    if (loan.status === 'completed') return 'Completado';
-    const nextDueDateStr = nextPaymentDates[loan.id];
-    if (!nextDueDateStr) return 'Al día';
-    const nextPayment = new Date(nextDueDateStr + 'T12:00:00');
-    const today = new Date();
-    const diffDays = Math.ceil((nextPayment.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays < 0) return `Vencido hace ${Math.abs(diffDays)} días`;
-    if (diffDays === 0) return 'Vence hoy';
-    return `Próximo pago en ${diffDays} días`;
-  };
+  const {
+    stats,
+    isLoading,
+    refreshing,
+    filter,
+    setFilter,
+    searchQuery,
+    setSearchQuery,
+    filteredLoans,
+    onRefresh,
+    handleNewLoan,
+    handleLinkLoan,
+    formatCurrency,
+    getLoanStatus,
+    getDueInfo,
+  } = useLoansList();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

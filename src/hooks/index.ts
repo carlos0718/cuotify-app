@@ -13,4 +13,6 @@ export { useNotificationSettings } from './useNotificationSettings';
 export { usePremiumScreen } from './usePremiumScreen';
 export { useCustomPaywall } from './useCustomPaywall';
 export { useSettingsHome, SUPPORT_EMAIL } from './useSettingsHome';
+export { useLoansList } from './useLoansList';
+export type { LoanListItem, LoansListFilter } from './useLoansList';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
