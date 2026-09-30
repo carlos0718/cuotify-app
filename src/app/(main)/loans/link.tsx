@@ -1,48 +1,17 @@
-import { useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
+import { useLoanLink } from '../../../hooks';
 
 export default function LinkLoanScreen() {
-  const [searchType, setSearchType] = useState<'dni' | 'email'>('dni');
-  const [searchValue, setSearchValue] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-
-  const handleSearch = () => {
-    if (!searchValue.trim()) {
-      Alert.alert('Error', `Ingresa el ${searchType === 'dni' ? 'DNI' : 'email'} del prestamista`);
-      return;
-    }
-
-    setIsSearching(true);
-
-    // Simular búsqueda
-    setTimeout(() => {
-      setIsSearching(false);
-      Alert.alert(
-        'Préstamo encontrado',
-        'Se encontró un préstamo de $5,000 con Juan Pérez. ¿Deseas vincularlo a tu cuenta?',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Vincular',
-            onPress: () => {
-              Alert.alert('Vinculado', 'El préstamo ha sido vinculado a tu cuenta');
-              router.back();
-            },
-          },
-        ]
-      );
-    }, 1500);
-  };
+  const { searchType, setSearchType, searchValue, setSearchValue, isSearching, handleSearch } = useLoanLink();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

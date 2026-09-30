@@ -15,4 +15,5 @@ export { useCustomPaywall } from './useCustomPaywall';
 export { useSettingsHome, SUPPORT_EMAIL } from './useSettingsHome';
 export { useLoansList } from './useLoansList';
 export type { LoanListItem, LoansListFilter } from './useLoansList';
+export { useLoanLink } from './useLoanLink';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';
