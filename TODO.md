@@ -4,6 +4,14 @@
 > Las features salen de `SPEC.md`; la deuda técnica y las mejoras, de `docs/IMPROVEMENTS.md`.
 > **Convención:** 1 tarea completada = 1 commit + push. Al cerrar una sección, actualizar `SPEC.md`.
 
+> **Nota (drift de contenido, 2026-10-02):** `rocky check drift` marca como "faltantes" las secciones
+> "Features iniciales", "Calidad" y "Estado por grupo" del template de `rocky-spec` — no son gaps reales.
+> "Features iniciales" está repartida por dominio (`Dominio / DB`, `Auth e identidad`, `Préstamos`,
+> `Deudas personales`, `Notificaciones`, `Dashboard y reportes`, `Monetización`, `Infraestructura / Deploy`,
+> `Seguridad`, `Observabilidad`) en vez de un bloque único, por decisión de `AGENTS.md`. "Calidad" está
+> dentro de `## Setup` (ESLint, typecheck, Jest, CI). "Estado por grupo" es una tabla del modo orquestador
+> (`todos/<grupo>.md`); este proyecto usa `TODO.md` único, así que no aplica.
+
 ---
 
 ## Setup
@@ -132,6 +140,8 @@
 - [ ] OWASP A07 · Revisar política de password más allá de los defaults de Supabase (rate limiting, complejidad)
 - [ ] OWASP A09 · Error tracking configurado — mismo trabajo que § A5 (Bloque 2, Sentry)
 - [ ] OWASP A10 · Revisar SSRF si el import por IA llega a aceptar URLs externas (hoy no aplica)
+- [ ] 🔴 OWASP LLM01 · Guarda contra prompt injection en `analyze-loans-document`/`analyze-credit-card` — § S9
+- [ ] 🔴 OWASP LLM10 · Rate limiting / límite de tamaño de archivo en las Edge Functions de análisis con IA — § S10
 
 ## Observabilidad
 

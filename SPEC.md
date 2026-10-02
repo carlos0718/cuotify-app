@@ -7,7 +7,7 @@
 
 ---
 
-## 1. Problema
+## 1. Problema (Descripción)
 
 En Latinoamérica una porción enorme del crédito personal ocurre **fuera del sistema
 bancario**: se presta plata entre conocidos, con interés, en cuotas semanales o
@@ -36,7 +36,7 @@ plata *y* deben plata. Por eso la app tiene dos módulos paralelos e independien
 Cuando el prestatario también es usuario de Cuotify, ambas vistas se sincronizan
 (vinculación por DNI) y el préstamo aparece en modo lectura del lado del deudor.
 
-## 3. Usuarios y roles
+## 3. Usuarios y roles (Usuarios objetivo)
 
 | Rol | Valor en `profiles.role` | Qué puede hacer |
 |---|---|---|
@@ -49,7 +49,7 @@ Cuando el prestatario también es usuario de Cuotify, ambas vistas se sincroniza
 
 ---
 
-## 4. Modelo de dominio (DDD)
+## 4. Modelo de dominio — Entidades y relaciones (DDD)
 
 ### 4.1 Lenguaje ubicuo
 
@@ -142,7 +142,12 @@ PersonalDebt: active ──► completed | cancelled ──► [delete permitido
 
 ---
 
-## 5. Features
+## 5. Features — MVP
+
+> Este proyecto no usa el esquema `RF-N`/`US-N` del template (features con ID + User Stories
+> propias) — usa Finding IDs (`S*`/`L*`/`A*`/`U*`/`P*`) como esquema de trazabilidad, documentado
+> en § 10 "Historial de cambios". Por eso no hay una sección "User Stories clave" separada: cada
+> bullet de abajo ya es la unidad de trazabilidad, y las nuevas se taguean con su Finding ID.
 
 Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pendiente
 
@@ -269,7 +274,7 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 
 ---
 
-## 7. Criterios de aceptación
+## 7. Criterios de aceptación — MVP listo cuando:
 
 ### Cerrados
 - [x] Un prestamista puede crear un préstamo y ver el cronograma completo generado
@@ -317,7 +322,7 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 
 ---
 
-## 9. Fuera de alcance (por ahora)
+## 9. Fuera de alcance (v1)
 
 - Procesamiento real de pagos (pasarelas, transferencias dentro de la app)
 - Scoring crediticio o buró de morosos compartido entre prestamistas

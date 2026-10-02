@@ -2,7 +2,7 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
-## Project Overview
+## Project Overview (Overview del proyecto)
 
 **Cuotify** is a React Native / Expo mobile app for managing personal loans. It allows lenders to create and track loans, manage borrowers, and monitor payment schedules. Borrowers can view their own loans and add comments to payments.
 
@@ -25,7 +25,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 > Las variables de entorno nunca van al repo. `.env` está en `.gitignore`. Los secrets de producción se configuran en variables de entorno de EAS (`eas secret` o el bloque `env` del perfil correspondiente en `eas.json`).
 
-## Commands
+## Commands (Comandos útiles)
 
 ```bash
 # Start development server
@@ -47,7 +47,7 @@ Copy `.env.example` to `.env` and fill in:
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon key
 - `EXPO_PROJECT_ID` — Expo project ID (for push notifications)
 
-## Architecture
+## Architecture (Arquitectura)
 
 ### Routing (Expo Router file-based)
 
