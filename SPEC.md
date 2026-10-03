@@ -197,7 +197,9 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - ✅ Revertir cuota pagada con vuelta del préstamo a `active`
 - ✅ Cálculo de mora por cuota con período de gracia
 - ✅ Calendario mensual con cuotas marcadas por color de préstamo
-- 🟡 La mora se recalcula **solo al abrir la pantalla del préstamo** — no hay job periódico
+- ✅ La mora se recalcula por **cron diario** (`pg_cron` → `recalculate_overdue_penalties`,
+  migración 013) sobre todos los pagos vencidos; el detalle la refresca on-demand al abrir.
+  Cálculo único en SQL (L7, requiere aplicar la migración)
 - ⏳ Registro de pagos parciales y de pagos adelantados
 
 ### 5.5 Notificaciones
@@ -250,6 +252,7 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 |---|---|---|---|
 | `generate_debt_payment_schedule` | RPC (Postgres function) | `007_add_monthly_interest_rpc.sql` y siguientes | `personalDebts.ts` al crear una deuda |
 | `get_monthly_interest_earned` | RPC | `007_add_monthly_interest_rpc.sql` | Dashboard prestamista (§ 5.6, gráfico pendiente) |
+| `recalculate_overdue_penalties` | RPC + cron (`pg_cron`) | `013_add_penalty_cron.sql` | Cron diario (todos los préstamos) + refresco on-demand del detalle (un préstamo) — única fuente de verdad del cálculo de mora (§ 5.4, L7) |
 | `after_loan_insert` (trigger, no RPC invocable) | Trigger de DB | `001_initial_schema.sql` | Se dispara solo al insertar en `loans` |
 | `analyze-loans-document` | Edge Function (Deno) | `supabase/functions/analyze-loans-document/` | Importación de préstamos en lote con Gemini (§ 5.2) |
 | `analyze-credit-card` | Edge Function (Deno) | `supabase/functions/analyze-credit-card/` | Import de resumen de tarjeta con IA (§ 5.3) |
@@ -290,6 +293,7 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
       notificaciones y comprobantes se borran en cascada
 - [x] La eliminación de cuenta exige reautenticación con contraseña y una
       confirmación explícita antes de ejecutarse
+- [x] La mora se actualiza sin necesidad de abrir la pantalla del préstamo (cron diario, L7)
 
 ### Abiertos
 - [ ] Un prestatario vinculado **no puede** modificar el estado de sus propias cuotas
@@ -297,7 +301,6 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - [ ] El límite del plan free cuenta solo los préstamos donde el usuario es prestamista
 - [ ] El préstamo abierto (`open`) se crea y se lee correctamente contra el schema real
 - [ ] Los totales del dashboard no mezclan ARS con USD
-- [ ] La mora se actualiza sin necesidad de abrir la pantalla del préstamo
 - [ ] Las pantallas principales son navegables con lector de pantalla
 - [ ] Un crash en cualquier pantalla no deja la app en blanco (ErrorBoundary)
 - [ ] `supabase/migrations/` reproduce exactamente el schema de producción
@@ -341,3 +344,4 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 | 2026-08-10 | Adopción del proyecto con `rocky-spec` (entonces `charlydev-flow`) — SPEC reconstruido desde el código existente | — |
 | 2026-09-11 | `.rocky-spec` actualizado a v0.20.0 — SPEC.md, AGENTS.md, CLAUDE.md, OBSERVABILITY.md, CHANGELOG.md y TODO.md alineados al template vigente (drift de contenido resuelto) | — |
 | 2026-09-29 | Agregado el flujo de eliminación de cuenta al dominio (§ 5.1) y a los contratos de API (§ 5.9) — implementación en curso | S8 |
+| 2026-10-02 | Recálculo de mora movido a cron SQL (`recalculate_overdue_penalties`, migración 013) — cierra el criterio "la mora se actualiza sin abrir la pantalla" (§ 7); cálculo único en SQL | L7 |

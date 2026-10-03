@@ -9,7 +9,6 @@ import {
   getNextPendingPaymentDatesByLoan,
   getLoanStats,
   getLinkedLoanPaymentStats,
-  updatePaymentPenalty,
   updateLoanPenalties,
 } from '../loans';
 
@@ -343,127 +342,35 @@ describe('getLinkedLoanPaymentStats', () => {
   });
 });
 
-describe('updatePaymentPenalty', () => {
-  it('si el pago ya está pagado, devuelve el pago actual sin recalcular ni actualizar', async () => {
-    const current = makePayment({ status: 'paid' });
-    let patchCalled = false;
-
-    server.use(
-      sequentialHandler('get', `${SUPABASE_URL}/rest/v1/payments`, [
-        { body: { ...current, loan: { grace_period_days: 3, late_penalty_type: 'fixed', late_penalty_rate: 5 } } },
-        { body: current },
-      ]),
-      http.patch(`${SUPABASE_URL}/rest/v1/payments`, () => {
-        patchCalled = true;
-        return HttpResponse.json(current);
-      })
-    );
-
-    const result = await updatePaymentPenalty('payment-1');
-
-    expect(result).toEqual(current);
-    expect(patchCalled).toBe(false);
-  });
-
-  it('si el préstamo no tiene penalización configurada, devuelve el pago actual sin recalcular', async () => {
-    const current = makePayment({ status: 'pending' });
-    let patchCalled = false;
-
-    server.use(
-      sequentialHandler('get', `${SUPABASE_URL}/rest/v1/payments`, [
-        { body: { ...current, loan: { grace_period_days: 3, late_penalty_type: 'none', late_penalty_rate: 0 } } },
-        { body: current },
-      ]),
-      http.patch(`${SUPABASE_URL}/rest/v1/payments`, () => {
-        patchCalled = true;
-        return HttpResponse.json(current);
-      })
-    );
-
-    const result = await updatePaymentPenalty('payment-1');
-
-    expect(result).toEqual(current);
-    expect(patchCalled).toBe(false);
-  });
-
-  it('calcula la penalización y marca el pago como vencido cuando corresponde', async () => {
-    const overduePayment = makePayment({
-      status: 'pending',
-      due_date: '2026-01-01', // muy vencido respecto al "hoy" real de la corrida
-      total_amount: 1000,
-    });
-    let patchBody: Record<string, unknown> | null = null;
-
-    server.use(
-      http.get(`${SUPABASE_URL}/rest/v1/payments`, () =>
-        HttpResponse.json({
-          ...overduePayment,
-          loan: { grace_period_days: 0, late_penalty_type: 'fixed', late_penalty_rate: 5 },
-        })
-      ),
-      http.patch(`${SUPABASE_URL}/rest/v1/payments`, async ({ request }) => {
-        patchBody = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...overduePayment, ...patchBody });
-      })
-    );
-
-    const result = await updatePaymentPenalty('payment-1');
-
-    expect(patchBody).not.toBeNull();
-    expect(patchBody!.status).toBe('overdue');
-    expect(patchBody!.penalty_amount).toBe(50); // 1000 * 5%
-    expect(result.status).toBe('overdue');
-  });
-});
-
 describe('updateLoanPenalties', () => {
-  it('si el préstamo no tiene penalización, devuelve los pagos sin modificarlos', async () => {
-    const payments = [makePayment({ id: 'p1' }), makePayment({ id: 'p2' })];
-    let patchCalled = false;
-
-    server.use(
-      http.get(`${SUPABASE_URL}/rest/v1/loans`, () =>
-        HttpResponse.json({ grace_period_days: 3, late_penalty_type: 'none', late_penalty_rate: 0 })
-      ),
-      http.get(`${SUPABASE_URL}/rest/v1/payments`, () => HttpResponse.json(payments)),
-      http.patch(`${SUPABASE_URL}/rest/v1/payments`, () => {
-        patchCalled = true;
-        return HttpResponse.json({});
-      })
-    );
-
-    const result = await updateLoanPenalties('loan-1');
-
-    expect(result).toEqual(payments);
-    expect(patchCalled).toBe(false);
-  });
-
-  it('recalcula la penalización de cada pago pendiente/vencido y devuelve la lista final', async () => {
-    const pending = [
-      makePayment({ id: 'p1', due_date: '2026-01-01', total_amount: 100 }),
-      makePayment({ id: 'p2', due_date: '2026-01-05', total_amount: 200 }),
-    ];
+  it('invoca el RPC de recálculo de mora para el préstamo y devuelve sus pagos actualizados', async () => {
     const finalList = [
       makePayment({ id: 'p1', status: 'overdue', penalty_amount: 5 }),
       makePayment({ id: 'p2', status: 'overdue', penalty_amount: 10 }),
     ];
-    const patchedIds: string[] = [];
+    let rpcBody: Record<string, unknown> | null = null;
 
     server.use(
-      http.get(`${SUPABASE_URL}/rest/v1/loans`, () =>
-        HttpResponse.json({ grace_period_days: 0, late_penalty_type: 'fixed', late_penalty_rate: 5 })
-      ),
-      sequentialHandler('get', `${SUPABASE_URL}/rest/v1/payments`, [{ body: pending }, { body: finalList }]),
-      http.patch(`${SUPABASE_URL}/rest/v1/payments`, ({ request }) => {
-        const id = new URL(request.url).searchParams.get('id');
-        patchedIds.push(id || '');
-        return HttpResponse.json(pending[0]);
-      })
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/recalculate_overdue_penalties`, async ({ request }) => {
+        rpcBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(null);
+      }),
+      http.get(`${SUPABASE_URL}/rest/v1/payments`, () => HttpResponse.json(finalList))
     );
 
     const result = await updateLoanPenalties('loan-1');
 
-    expect(patchedIds).toEqual(['eq.p1', 'eq.p2']);
+    expect(rpcBody).toEqual({ p_loan_id: 'loan-1' });
     expect(result).toEqual(finalList);
+  });
+
+  it('propaga el error si el RPC de recálculo falla', async () => {
+    server.use(
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/recalculate_overdue_penalties`, () =>
+        HttpResponse.json({ message: 'recálculo de mora falló' }, { status: 500 })
+      )
+    );
+
+    await expect(updateLoanPenalties('loan-1')).rejects.toThrow('recálculo de mora falló');
   });
 });

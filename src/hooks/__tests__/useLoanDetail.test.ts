@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import {
   getLoanById,
   getPaymentsByLoan,
+  updateLoanPenalties,
   markPaymentAsPaid,
   revertPaymentToPending,
   deleteLoan,
@@ -25,6 +26,7 @@ jest.mock('expo-router', () => {
 jest.mock('../../services/supabase', () => ({
   getLoanById: jest.fn(),
   getPaymentsByLoan: jest.fn(),
+  updateLoanPenalties: jest.fn(),
   markPaymentAsPaid: jest.fn(),
   revertPaymentToPending: jest.fn(),
   deleteLoan: jest.fn(),
@@ -103,19 +105,32 @@ describe('useLoanDetail', () => {
     (useSubscriptionStore as unknown as jest.Mock).mockReturnValue({ premium: true });
     (getLoanById as jest.Mock).mockResolvedValue(makeLoan());
     (getPaymentsByLoan as jest.Mock).mockResolvedValue([makePayment()]);
+    (updateLoanPenalties as jest.Mock).mockResolvedValue([makePayment()]);
     jest.spyOn(Linking, 'openURL').mockImplementation(() => Promise.resolve());
   });
 
-  it('carga el préstamo y los pagos al montar, y termina isLoading', async () => {
+  it('carga el préstamo y refresca la mora al montar (prestamista), y termina isLoading', async () => {
     const { result } = await renderHook(() => useLoanDetail('loan-1', false));
 
     await act(async () => {});
 
     expect(getLoanById).toHaveBeenCalledWith('loan-1');
-    expect(getPaymentsByLoan).toHaveBeenCalledWith('loan-1');
+    // El prestamista (no read-only) refresca la mora vía updateLoanPenalties, no getPaymentsByLoan
+    expect(updateLoanPenalties).toHaveBeenCalledWith('loan-1');
+    expect(getPaymentsByLoan).not.toHaveBeenCalled();
     expect(result.current.loan?.id).toBe('loan-1');
     expect(result.current.payments).toHaveLength(1);
     expect(result.current.isLoading).toBe(false);
+  });
+
+  it('en modo solo-lectura lee los pagos sin recalcular la mora', async () => {
+    const { result } = await renderHook(() => useLoanDetail('loan-1', true));
+
+    await act(async () => {});
+
+    expect(getPaymentsByLoan).toHaveBeenCalledWith('loan-1');
+    expect(updateLoanPenalties).not.toHaveBeenCalled();
+    expect(result.current.payments).toHaveLength(1);
   });
 
   it('sin id, no llama a los servicios', async () => {
@@ -125,6 +140,7 @@ describe('useLoanDetail', () => {
 
     expect(getLoanById).not.toHaveBeenCalled();
     expect(getPaymentsByLoan).not.toHaveBeenCalled();
+    expect(updateLoanPenalties).not.toHaveBeenCalled();
   });
 
   it('si falla la carga, muestra un error', async () => {
@@ -314,7 +330,7 @@ describe('useLoanDetail', () => {
   });
 
   it('handleWhatsApp avisa que está al día si no hay cuotas pendientes', async () => {
-    (getPaymentsByLoan as jest.Mock).mockResolvedValue([makePayment({ status: 'paid' })]);
+    (updateLoanPenalties as jest.Mock).mockResolvedValue([makePayment({ status: 'paid' })]);
     const { result } = await renderHook(() => useLoanDetail('loan-1', false));
     await act(async () => {});
 

@@ -1,7 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal as RNModal, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { calculateLatePenalty } from '../../../services/calculations';
 import { Modal } from '../../../components';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
 import { Payment, LatePenaltyType } from '../../../types';
@@ -20,24 +19,22 @@ function PaymentItem({
   penaltyConfig: {
     gracePeriodDays: number;
     latePenaltyType: LatePenaltyType;
-    latePenaltyRate: number;
   };
 }) {
   const today = new Date().toISOString().split('T')[0];
-  const isOverdue = payment.status === 'pending' && payment.due_date < today;
+  const isOverdue =
+    payment.status === 'overdue' || (payment.status === 'pending' && payment.due_date < today);
 
   const status: PaymentStatus = payment.status === 'paid' ? 'paid' : isOverdue ? 'overdue' : 'pending';
 
-  // Calcular penalización si está vencido
-  const penaltyResult = isOverdue && penaltyConfig.latePenaltyType !== 'none'
-    ? calculateLatePenalty({
-        dueDate: new Date(payment.due_date),
-        paymentAmount: payment.total_amount,
-        gracePeriodDays: penaltyConfig.gracePeriodDays,
-        latePenaltyType: penaltyConfig.latePenaltyType,
-        latePenaltyRate: penaltyConfig.latePenaltyRate,
-      })
-    : null;
+  // Info de atraso para el display (solo aritmética de fechas). El MONTO de mora lo
+  // calcula y persiste la función SQL recalculate_overdue_penalties (migración 013,
+  // finding L7) — acá se lee payment.penalty_amount, no se recalcula en el cliente.
+  const hasPenaltyConfig = penaltyConfig.latePenaltyType !== 'none';
+  const daysOverdue = isOverdue
+    ? Math.floor((Date.parse(today) - Date.parse(payment.due_date)) / 86400000)
+    : 0;
+  const daysAfterGrace = Math.max(0, daysOverdue - penaltyConfig.gracePeriodDays);
 
   const statusConfig = {
     pending: { color: colors.warning, label: 'Pendiente', bg: colors.warning + '20' },
@@ -64,7 +61,7 @@ function PaymentItem({
     }).format(amount);
   };
 
-  const penaltyAmount = penaltyResult?.penaltyAmount || payment.penalty_amount || 0;
+  const penaltyAmount = payment.penalty_amount || 0;
 
   return (
     <View style={styles.paymentItem}>
@@ -79,14 +76,14 @@ function PaymentItem({
             <Text style={styles.penaltyAmount}>+{formatCurrency(penaltyAmount)}</Text>
           )}
         </View>
-        {penaltyResult && penaltyResult.daysAfterGrace > 0 && (
+        {hasPenaltyConfig && isOverdue && daysAfterGrace > 0 && (
           <Text style={styles.penaltyInfo}>
-            Mora: {penaltyResult.daysOverdue} días de atraso
+            Mora: {daysOverdue} días de atraso
           </Text>
         )}
-        {penaltyResult && penaltyResult.isOverdue && penaltyResult.daysAfterGrace === 0 && (
+        {hasPenaltyConfig && isOverdue && daysAfterGrace === 0 && (
           <Text style={styles.graceInfo}>
-            En período de gracia ({penaltyConfig.gracePeriodDays - penaltyResult.daysOverdue} días restantes)
+            En período de gracia ({penaltyConfig.gracePeriodDays - daysOverdue} días restantes)
           </Text>
         )}
       </View>
@@ -329,7 +326,6 @@ export default function LoanDetailScreen() {
                 penaltyConfig={{
                   gracePeriodDays: loan.grace_period_days || 7,
                   latePenaltyType: loan.late_penalty_type || 'none',
-                  latePenaltyRate: loan.late_penalty_rate || 0,
                 }}
               />
             ))

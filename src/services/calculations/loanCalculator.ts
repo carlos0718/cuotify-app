@@ -218,7 +218,14 @@ export interface PenaltyCalculationResult {
 }
 
 /**
- * Calcula la penalización por mora de un pago atrasado
+ * Calcula la penalización por mora de un pago atrasado.
+ *
+ * Desde el finding L7, el cálculo de mora que se PERSISTE vive en la función SQL
+ * `recalculate_overdue_penalties` (migración 013) — esa es la única fuente de verdad
+ * en runtime (la corre el cron diario y el refresco on-demand del detalle). Esta
+ * función TS se mantiene como ORÁCULO de referencia: documenta y testea la fórmula
+ * exacta que el SQL replica. No la llama el código de la app. Si cambia la fórmula,
+ * cambiar ambas y mantener los tests de `calculateLatePenalty` en sync con el SQL.
  *
  * @param input - Datos del pago y configuración de penalización
  * @returns Resultado con días de atraso y monto de penalización

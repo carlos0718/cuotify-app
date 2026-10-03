@@ -600,6 +600,10 @@ export type Database = {
           year: number
         }[]
       }
+      recalculate_overdue_penalties: {
+        Args: { p_loan_id?: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

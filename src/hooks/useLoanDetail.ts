@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Linking } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { getLoanById, getPaymentsByLoan, markPaymentAsPaid, revertPaymentToPending, deleteLoan } from '../services/supabase';
+import { getLoanById, getPaymentsByLoan, updateLoanPenalties, markPaymentAsPaid, revertPaymentToPending, deleteLoan } from '../services/supabase';
 import { cancelPaymentNotification, updateBadgeCount } from '../services/notifications';
 import { generateLoanPDF } from '../services/pdf/loanPdf';
 import { useSubscriptionStore } from '../store';
@@ -57,9 +57,12 @@ export function useLoanDetail(id: string | undefined, isReadOnly: boolean) {
     if (!id) return;
 
     try {
+      // El prestamista refresca la mora persistida al abrir (updateLoanPenalties
+      // recalcula vía la función SQL y devuelve los pagos frescos); el prestatario
+      // en solo-lectura solo lee, el cron diario mantiene su vista al día.
       const [loanData, paymentsData] = await Promise.all([
         getLoanById(id),
-        getPaymentsByLoan(id),
+        isReadOnly ? getPaymentsByLoan(id) : updateLoanPenalties(id),
       ]);
       setLoan(loanData as LoanDetail);
       setPayments(paymentsData as Payment[]);
@@ -70,7 +73,7 @@ export function useLoanDetail(id: string | undefined, isReadOnly: boolean) {
       setIsLoading(false);
       setRefreshing(false);
     }
-  }, [id, showError]);
+  }, [id, isReadOnly, showError]);
 
   useFocusEffect(
     useCallback(() => {

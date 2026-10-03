@@ -358,17 +358,33 @@ cronograma completo y lo inserte junto al préstamo en una transacción (RPC), y
 trigger desaparezca. La alternativa es que el trigger sea el único que calcule y que el
 cliente use la misma RPC para el preview.
 
-### 🟠 L7 · La mora solo se recalcula si alguien abre la pantalla
-`updateLoanPenalties()` se invoca desde el detalle del préstamo. Si el prestamista no
-entra, `penalty_amount` queda congelado y el estado nunca pasa a `overdue`. El
-dashboard, el calendario y las notificaciones muestran datos desactualizados.
+### ✅ L7 · La mora solo se recalcula si alguien abre la pantalla — Resuelto
 
-Además `updateLoanPenalties` hace **un `UPDATE` por cuota en un loop secuencial**
-(`loans.ts:702-726`): un préstamo de 24 cuotas dispara 24 round-trips.
+> **Corregido el 2026-10-02** (migración `013_add_penalty_cron.sql`). Al investigar se
+> encontró que el problema era peor de lo descrito: `updateLoanPenalties()` y
+> `updatePaymentPenalty()` ya ni se invocaban (código muerto, solo en tests), así que
+> `penalty_amount` en la práctica **nunca** se persistía — el detalle calculaba la mora
+> en vivo con TS sin guardarla, y el dashboard/calendario/notificaciones leían ceros.
 
-**Fix:** mover el cálculo a un cron de Supabase (`pg_cron`) que corra una vez por día
-sobre todos los pagos vencidos, en un solo `UPDATE ... FROM`. El cliente pasa a solo
-leer. Bonus: habilita notificaciones de mora reales.
+Estado previo: `updateLoanPenalties()` recalculaba con **un `UPDATE` por cuota en un loop
+secuencial** (`loans.ts:702-726`): un préstamo de 24 cuotas disparaba 24 round-trips. Y
+estaba desconectado de la UI.
+
+**Fix aplicado (camino A — única fuente de verdad en SQL):**
+- Función SQL `recalculate_overdue_penalties(p_loan_id uuid DEFAULT NULL)` que recalcula
+  `penalty_amount` y pasa `status` de `pending` → `overdue` en un solo `UPDATE ... FROM`
+  set-based (sin loop). Replica exactamente la fórmula de `calculateLatePenalty`.
+- Cron `pg_cron` diario (06:00 UTC) que la corre sobre todos los préstamos + backfill
+  inmediato al aplicar la migración.
+- `SECURITY DEFINER` con guarda `l.lender_id = auth.uid()` para el llamado on-demand
+  (nadie recalcula mora de préstamos ajenos); el cron usa `p_loan_id` NULL.
+- `updateLoanPenalties` pasó a ser wrapper del RPC (refresco on-demand al abrir el
+  detalle); `updatePaymentPenalty` eliminada; el detalle muestra el valor persistido.
+- `calculateLatePenalty` (TS) se mantiene como oráculo de referencia de la fórmula (el
+  money-math en SQL no es unit-testeable en el setup jest-expo actual). Cerrar L6 para
+  mora del todo requeriría pgTAP o un harness de integración — queda como seguimiento.
+
+⚠️ Requiere **aplicar la migración** a la DB (`supabase db push`) y regenerar tipos.
 
 ### 🟠 L8 · `markPaymentAsPaid` no es atómico
 `loans.ts:382-428` hace: leer el pago → actualizar → leer todos los pagos → actualizar

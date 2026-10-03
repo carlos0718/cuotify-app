@@ -52,7 +52,12 @@
 - [x] 🔴 Migración 010: cerrar el INSERT abierto de notificaciones — § S2
 - [x] 🔴 Migración 012: `interest_rate` a `DECIMAL(8,2)` — § L3
 - [x] Regenerar `database.types.ts` contra el schema real — § A7
-- [ ] Cron (`pg_cron`) que recalcule mora diariamente — § L7
+- [x] Cron (`pg_cron`) que recalcule mora diariamente — § L7
+      (migración `013_add_penalty_cron.sql`: función SQL `recalculate_overdue_penalties`
+      como única fuente de verdad del cálculo + cron diario 06:00 UTC + backfill inmediato.
+      `updateLoanPenalties` pasó a wrapper del RPC; `updatePaymentPenalty` eliminada (muerta);
+      el detalle muestra el `penalty_amount` persistido. ⚠️ Falta APLICAR la migración a la DB
+      (`supabase db push`) y regenerar tipos — hasta entonces el RPC no existe en el servidor)
 - [ ] RPC transaccional `mark_payment_paid` / `revert_payment` — § L8
 
 ## Auth e identidad
