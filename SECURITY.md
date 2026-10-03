@@ -36,7 +36,7 @@ Se confirma la recepción en un plazo razonable y se coordina la corrección ant
 
 Estado real al 2026-09-11, según `TODO.md` § Bloque 1 (cerrado) y hallazgos pendientes de `docs/IMPROVEMENTS.md`:
 
-- [x] A01 · Broken Access Control — RLS en todas las tablas; cerrado el UPDATE abierto de prestatarios sobre `payments` (S1) y el INSERT abierto de `notifications` (S2)
+- [x] A01 · Broken Access Control — RLS en todas las tablas; cerrado el UPDATE abierto de prestatarios sobre `payments` (S1) y el INSERT abierto de `notifications` (S2). El trigger de S1 se amplió en la migración 013 con un bypass de contexto de sistema (`auth.uid() IS NULL`) para el cron de mora — sin debilitar la restricción al prestatario (ver `docs/IMPROVEMENTS.md` § S1)
 - [x] A02 · Cryptographic Failures — passwords hasheados por Supabase Auth, HTTPS forzado (Supabase + EAS)
 - [x] A03 · Injection — todo el acceso a datos vía el cliente de Supabase (queries parametrizadas), sin SQL concatenado a mano
 - [x] A04 · Insecure Design — el préstamo abierto (`interest_type: 'open'`) violaba 3 constraints del schema, corregido (S4); mora e interés validados en `loanCalculator.ts`

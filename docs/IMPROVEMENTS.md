@@ -30,6 +30,14 @@ si no, `RAISE EXCEPTION`. La policy de RLS sigue existiendo como primera barrera
 (visibilidad de fila) y ahora tiene `WITH CHECK` explícito. Aplicado y verificado
 contra producción (`pg_policy` / `pg_trigger`).
 
+> **Extensión 2026-10-03** (migración 013, finding L7): el trigger se amplió con un
+> bypass para el **contexto de sistema** (`auth.uid() IS NULL` → cron, backfill,
+> migraciones, funciones `SECURITY DEFINER` sin JWT). Era necesario porque el cron de
+> recálculo de mora corre sin JWT y el trigger lo bloqueaba. **No debilita S1**: un
+> prestatario siempre tiene `auth.uid()` no-nulo, así que sigue sujeto a la restricción
+> de columnas; y un cliente anónimo nunca llega al trigger porque la RLS de `payments`
+> exige `auth.uid()` antes.
+
 <details>
 <summary>Análisis original (el fix propuesto ahí no se usó, ver arriba)</summary>
 

@@ -56,8 +56,9 @@
       (migración `013_add_penalty_cron.sql`: función SQL `recalculate_overdue_penalties`
       como única fuente de verdad del cálculo + cron diario 06:00 UTC + backfill inmediato.
       `updateLoanPenalties` pasó a wrapper del RPC; `updatePaymentPenalty` eliminada (muerta);
-      el detalle muestra el `penalty_amount` persistido. ⚠️ Falta APLICAR la migración a la DB
-      (`supabase db push`) y regenerar tipos — hasta entonces el RPC no existe en el servidor)
+      el detalle muestra el `penalty_amount` persistido. La migración también amplió el trigger
+      de S1 con un bypass de contexto de sistema (`auth.uid() IS NULL`) para que el cron/backfill
+      no fueran bloqueados. Aplicada a la DB el 2026-10-03 vía `supabase db push`)
 - [ ] RPC transaccional `mark_payment_paid` / `revert_payment` — § L8
 
 ## Auth e identidad

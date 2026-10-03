@@ -73,7 +73,60 @@ COMMENT ON FUNCTION public.recalculate_overdue_penalties(uuid) IS
   'Única fuente de verdad del cálculo de mora (camino A, finding L7). '
   'p_loan_id NULL = todos (cron diario); puntual = un préstamo (refresco on-demand).';
 
--- 3. Agendar el cron diario a las 06:00 UTC (≈ 03:00 ART).
+-- 3. Ajustar el trigger de S1 (migración 009) para permitir el contexto de sistema.
+--    El trigger enforce_borrower_payment_columns bloquea cambios a columnas que no sean
+--    el comentario cuando quien edita no es el prestamista. El cron y el backfill de esta
+--    migración corren SIN contexto de auth (auth.uid() = NULL), así que v_is_lender queda
+--    NULL -> COALESCE(NULL, false) = false -> bloquea el UPDATE de penalty_amount/status.
+--    Se agrega un bypass para auth.uid() IS NULL (cron / backfill / migración / funciones
+--    SECURITY DEFINER de sistema). NO reabre S1: un prestatario siempre tiene auth.uid()
+--    no-nulo, así que sigue sujeto a la restricción de columnas. Un cliente anónimo nunca
+--    llega al trigger porque la RLS de payments exige auth.uid() antes.
+CREATE OR REPLACE FUNCTION public.enforce_borrower_payment_columns()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  v_is_lender BOOLEAN;
+BEGIN
+  -- Contexto de sistema (cron, backfill, migración, funciones SECURITY DEFINER sin JWT):
+  -- no hay usuario que restringir. La RLS ya filtró cualquier cliente no autenticado.
+  IF auth.uid() IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT (l.lender_id = auth.uid()) INTO v_is_lender
+  FROM public.loans l
+  WHERE l.id = NEW.loan_id;
+
+  -- El prestamista puede modificar la fila entera; solo se restringe
+  -- a quien la edita como prestatario (o cualquier otro actor no identificado
+  -- como prestamista, que en ese caso no debería llegar hasta acá por RLS).
+  IF COALESCE(v_is_lender, false) THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.status               IS DISTINCT FROM OLD.status
+     OR NEW.paid_amount        IS DISTINCT FROM OLD.paid_amount
+     OR NEW.paid_date          IS DISTINCT FROM OLD.paid_date
+     OR NEW.principal_portion  IS DISTINCT FROM OLD.principal_portion
+     OR NEW.interest_portion   IS DISTINCT FROM OLD.interest_portion
+     OR NEW.total_amount       IS DISTINCT FROM OLD.total_amount
+     OR NEW.remaining_balance  IS DISTINCT FROM OLD.remaining_balance
+     OR NEW.lender_note        IS DISTINCT FROM OLD.lender_note
+     OR NEW.penalty_amount     IS DISTINCT FROM OLD.penalty_amount
+     OR NEW.penalty_calculated_at IS DISTINCT FROM OLD.penalty_calculated_at
+  THEN
+    RAISE EXCEPTION 'Un prestatario solo puede modificar el comentario de su cuota';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+-- 4. Agendar el cron diario a las 06:00 UTC (≈ 03:00 ART).
 --    cron.schedule con el mismo jobname es idempotente en pg_cron 1.6+ (reescribe
 --    el job existente en vez de duplicarlo), así que re-aplicar la migración es seguro.
 SELECT cron.schedule(
@@ -82,6 +135,6 @@ SELECT cron.schedule(
   $$ SELECT public.recalculate_overdue_penalties(); $$
 );
 
--- 4. Backfill inmediato: corregir de una los pagos ya vencidos al aplicar la migración,
+-- 5. Backfill inmediato: corregir de una los pagos ya vencidos al aplicar la migración,
 --    sin esperar a la primera corrida del cron.
 SELECT public.recalculate_overdue_penalties();
