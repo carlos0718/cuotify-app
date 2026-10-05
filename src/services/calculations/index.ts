@@ -3,6 +3,7 @@ export {
   generateAmortizationSchedule,
   calculateEndDate,
   formatCurrency,
+  convertCurrency,
   calculatePaymentProgress,
   calculateLatePenalty,
   formatPenaltyStatus,

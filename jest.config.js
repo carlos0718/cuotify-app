@@ -43,6 +43,7 @@ module.exports = {
       moduleNameMapper: logicModuleNameMapper,
       testMatch: [
         '<rootDir>/src/services/supabase/**/__tests__/**/*.test.ts',
+        '<rootDir>/src/services/exchangeRate/**/__tests__/**/*.test.ts',
         '<rootDir>/src/store/**/__tests__/**/*.test.ts',
       ],
       // msw y @mswjs/interceptors distribuyen varias dependencias como ESM puro

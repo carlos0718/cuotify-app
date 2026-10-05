@@ -373,7 +373,7 @@
 - [ ] **P1** Pago parcial
 - [ ] **P2** Recibo por cuota compartible
 - [ ] **P3** Historial y score del prestatario
-- [ ] **P4** Cotización ARS/USD
+- [x] **P4** Cotización ARS/USD
 - [ ] **P5** Onboarding en el primer uso
 - [ ] **P6** Resumen diario "a quién cobro hoy"
 - [ ] **P7** Cartera compartida entre socios

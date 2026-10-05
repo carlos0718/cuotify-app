@@ -47,9 +47,12 @@ export default function SettingsScreen() {
   const {
     profile,
     defaultCurrency,
+    dollarRateType,
     premium,
     showCurrencyModal,
     setShowCurrencyModal,
+    showDollarRateModal,
+    setShowDollarRateModal,
     showLogoutModal,
     setShowLogoutModal,
     showContactModal,
@@ -73,7 +76,14 @@ export default function SettingsScreen() {
     handleContactWhatsApp,
     handleRateApp,
     handleSelectCurrency,
+    handleSelectDollarRate,
   } = useSettingsHome();
+
+  const dollarRateLabel: Record<typeof dollarRateType, string> = {
+    oficial: 'Dólar oficial',
+    blue: 'Dólar blue',
+    mep: 'Dólar MEP',
+  };
 
   const roleLabel = {
     lender: 'Prestamista',
@@ -148,6 +158,12 @@ export default function SettingsScreen() {
             title="Moneda por defecto"
             subtitle={defaultCurrency === 'ARS' ? '🇦🇷 Pesos (ARS)' : '🇺🇸 Dólares (USD)'}
             onPress={() => setShowCurrencyModal(true)}
+          />
+          <SettingsItem
+            icon="💵"
+            title="Cotización del dólar"
+            subtitle={dollarRateLabel[dollarRateType]}
+            onPress={() => setShowDollarRateModal(true)}
           />
           <SettingsItem
             icon="🎨"
@@ -252,6 +268,34 @@ export default function SettingsScreen() {
             text: '🇺🇸  Dólares (USD)',
             style: defaultCurrency === 'USD' ? 'primary' : 'default',
             onPress: () => handleSelectCurrency('USD'),
+          },
+          { text: 'Cancelar', style: 'cancel' },
+        ]}
+      />
+
+      {/* Modal de Cotización del dólar (P4) */}
+      <Modal
+        visible={showDollarRateModal}
+        onClose={() => setShowDollarRateModal(false)}
+        title="Cotización del dólar"
+        message="Elegí qué cotización usar para mostrar el equivalente entre pesos y dólares. No cambia los montos de tus préstamos."
+        icon="💵"
+        accentColor={colors.primary.main}
+        buttons={[
+          {
+            text: 'Dólar oficial',
+            style: dollarRateType === 'oficial' ? 'primary' : 'default',
+            onPress: () => handleSelectDollarRate('oficial'),
+          },
+          {
+            text: 'Dólar blue',
+            style: dollarRateType === 'blue' ? 'primary' : 'default',
+            onPress: () => handleSelectDollarRate('blue'),
+          },
+          {
+            text: 'Dólar MEP',
+            style: dollarRateType === 'mep' ? 'primary' : 'default',
+            onPress: () => handleSelectDollarRate('mep'),
           },
           { text: 'Cancelar', style: 'cancel' },
         ]}

@@ -1,10 +1,11 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal as RNModal, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { Modal } from '../../../components';
+import { Modal, CurrencyEquivalent } from '../../../components';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
+import { CurrencyType } from '../../../types';
 import { DebtPayment } from '../../../services/supabase/personalDebts';
-import { useDebtDetail, DebtPaymentStatus as PaymentStatus } from '../../../hooks';
+import { useDebtDetail, DebtPaymentStatus as PaymentStatus, useExchangeRate } from '../../../hooks';
 
 function PaymentItem({
   payment,
@@ -99,6 +100,8 @@ export default function DebtDetailScreen() {
     formatCurrency,
     formatDate,
   } = useDebtDetail(id);
+
+  const exchange = useExchangeRate();
 
   if (isLoading) {
     return (
@@ -204,6 +207,12 @@ export default function DebtDetailScreen() {
                 {formatCurrency(debt.total_amount)}
               </Text>
             </View>
+            <CurrencyEquivalent
+              amount={debt.total_amount}
+              currency={(debt.currency || 'ARS') as CurrencyType}
+              exchange={exchange}
+              style={styles.equivalentLine}
+            />
           </View>
 
           {/* Comprobante de transferencia */}
@@ -474,6 +483,10 @@ const styles = StyleSheet.create({
   detailValueHighlight: {
     color: colors.primary.main,
     fontWeight: fontWeight.bold,
+  },
+  equivalentLine: {
+    textAlign: 'right',
+    marginTop: spacing.xs,
   },
   datesSection: {
     flexDirection: 'row',

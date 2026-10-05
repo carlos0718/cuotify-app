@@ -2,6 +2,7 @@ import { usePreferencesStore } from '../preferencesStore';
 
 const defaults = {
   defaultCurrency: 'ARS' as const,
+  dollarRateType: 'blue' as const,
   reminderDaysBefore: 3,
   pushEnabled: true,
 };
@@ -14,6 +15,7 @@ describe('usePreferencesStore', () => {
   it('arranca con los valores por defecto', () => {
     const state = usePreferencesStore.getState();
     expect(state.defaultCurrency).toBe('ARS');
+    expect(state.dollarRateType).toBe('blue');
     expect(state.reminderDaysBefore).toBe(3);
     expect(state.pushEnabled).toBe(true);
   });
@@ -21,6 +23,11 @@ describe('usePreferencesStore', () => {
   it('setDefaultCurrency actualiza la moneda', () => {
     usePreferencesStore.getState().setDefaultCurrency('USD');
     expect(usePreferencesStore.getState().defaultCurrency).toBe('USD');
+  });
+
+  it('setDollarRateType actualiza el tipo de cotización', () => {
+    usePreferencesStore.getState().setDollarRateType('mep');
+    expect(usePreferencesStore.getState().dollarRateType).toBe('mep');
   });
 
   it('setReminderDaysBefore actualiza los días de recordatorio', () => {
@@ -35,6 +42,7 @@ describe('usePreferencesStore', () => {
 
   it('resetPreferences vuelve a los valores por defecto', () => {
     usePreferencesStore.getState().setDefaultCurrency('USD');
+    usePreferencesStore.getState().setDollarRateType('oficial');
     usePreferencesStore.getState().setReminderDaysBefore(10);
     usePreferencesStore.getState().setPushEnabled(false);
 
@@ -42,6 +50,7 @@ describe('usePreferencesStore', () => {
 
     const state = usePreferencesStore.getState();
     expect(state.defaultCurrency).toBe('ARS');
+    expect(state.dollarRateType).toBe('blue');
     expect(state.reminderDaysBefore).toBe(3);
     expect(state.pushEnabled).toBe(true);
   });

@@ -6,6 +6,7 @@ import {
   InterestType,
   LatePenaltyType,
   CurrencyType,
+  ExchangeRate,
 } from '../../types';
 
 /**
@@ -181,6 +182,24 @@ export function formatCurrency(amount: number, currency: CurrencyType = 'ARS'): 
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+/**
+ * Convierte un monto entre ARS y USD usando una cotización (P4).
+ *
+ * La cotización es "ARS por 1 USD" (campo `sell`). Es **solo para mostrar**: nunca se
+ * guarda un monto convertido. Si `from === to` devuelve el monto sin tocar.
+ */
+export function convertCurrency(
+  amount: number,
+  from: CurrencyType,
+  to: CurrencyType,
+  rate: ExchangeRate,
+): number {
+  if (from === to) return amount;
+  if (from === 'USD' && to === 'ARS') return roundToTwo(amount * rate.sell);
+  if (from === 'ARS' && to === 'USD') return roundToTwo(amount / rate.sell);
+  return amount;
 }
 
 /**
