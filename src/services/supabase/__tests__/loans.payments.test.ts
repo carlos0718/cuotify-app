@@ -69,89 +69,69 @@ function makePayment(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Responde en orden a llamadas sucesivas al mismo method+path (para awaits secuenciales). */
-function sequentialHandler(
-  method: 'get' | 'post' | 'patch' | 'delete',
-  path: string,
-  responses: { status?: number; body?: unknown }[]
-) {
-  let i = 0;
-  return http[method](path, () => {
-    const r = responses[Math.min(i, responses.length - 1)];
-    i++;
-    if (r.body === undefined) return new HttpResponse(null, { status: r.status ?? 204 });
-    return HttpResponse.json(r.body, { status: r.status ?? 200 });
-  });
-}
-
 /** Permite que el mock de /rest/v1/profiles no sea necesario mockear a mano en cada test. */
 function mockNoLinkedProfile() {
   server.use(http.get(`${SUPABASE_URL}/rest/v1/profiles`, () => HttpResponse.json([])));
 }
 
+// L8: la transición de estado del préstamo (completar / reactivar) ahora es atómica
+// dentro de las RPC `mark_payment_paid` / `revert_payment` (migración 014). Desde el
+// cliente se testea el contrato: args correctos, fila devuelta y propagación de errores.
 describe('markPaymentAsPaid', () => {
-  it('marca el pago como pagado pero no completa el préstamo si quedan cuotas pendientes', async () => {
+  it('invoca la RPC mark_payment_paid con el pago y el monto, y devuelve la fila actualizada', async () => {
     const updated = makePayment({ status: 'paid', paid_amount: 93.33 });
-    let loanPatched = false;
+    let rpcBody: Record<string, unknown> | null = null;
 
     server.use(
-      sequentialHandler('get', `${SUPABASE_URL}/rest/v1/payments`, [
-        { body: { loan_id: 'loan-1' } },
-        { body: [{ status: 'paid' }, { status: 'pending' }] },
-      ]),
-      http.patch(`${SUPABASE_URL}/rest/v1/payments`, () => HttpResponse.json(updated)),
-      http.patch(`${SUPABASE_URL}/rest/v1/loans`, () => {
-        loanPatched = true;
-        return new HttpResponse(null, { status: 204 });
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/mark_payment_paid`, async ({ request }) => {
+        rpcBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(updated);
       })
     );
 
     const result = await markPaymentAsPaid('payment-1', 93.33);
 
+    expect(rpcBody).toEqual({ p_payment_id: 'payment-1', p_paid_amount: 93.33 });
     expect(result).toEqual(updated);
-    expect(loanPatched).toBe(false);
   });
 
-  it('completa el préstamo automáticamente cuando se paga la última cuota pendiente', async () => {
-    const updated = makePayment({ status: 'paid', paid_amount: 93.33 });
-    let loanPatchBody: unknown = null;
-
+  it('propaga el error si la RPC falla', async () => {
     server.use(
-      sequentialHandler('get', `${SUPABASE_URL}/rest/v1/payments`, [
-        { body: { loan_id: 'loan-1' } },
-        { body: [{ status: 'paid' }, { status: 'paid' }] },
-      ]),
-      http.patch(`${SUPABASE_URL}/rest/v1/payments`, () => HttpResponse.json(updated)),
-      http.patch(`${SUPABASE_URL}/rest/v1/loans`, async ({ request }) => {
-        loanPatchBody = await request.json();
-        return new HttpResponse(null, { status: 204 });
-      })
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/mark_payment_paid`, () =>
+        HttpResponse.json({ message: 'pago no encontrado' }, { status: 500 })
+      )
     );
 
-    await markPaymentAsPaid('payment-1', 93.33);
-
-    expect(loanPatchBody).toEqual({ status: 'completed' });
+    await expect(markPaymentAsPaid('payment-1', 93.33)).rejects.toThrow('pago no encontrado');
   });
 });
 
 describe('revertPaymentToPending', () => {
-  it('revierte el pago a pendiente y reactiva el préstamo si estaba completado', async () => {
+  it('invoca la RPC revert_payment con el pago y devuelve la fila revertida', async () => {
     const reverted = makePayment({ status: 'pending', paid_amount: 0, paid_date: null });
-    let loanPatchBody: unknown = null;
+    let rpcBody: Record<string, unknown> | null = null;
 
     server.use(
-      sequentialHandler('get', `${SUPABASE_URL}/rest/v1/payments`, [{ body: { loan_id: 'loan-1' } }]),
-      http.patch(`${SUPABASE_URL}/rest/v1/payments`, () => HttpResponse.json(reverted)),
-      http.patch(`${SUPABASE_URL}/rest/v1/loans`, async ({ request }) => {
-        loanPatchBody = await request.json();
-        return new HttpResponse(null, { status: 204 });
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/revert_payment`, async ({ request }) => {
+        rpcBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(reverted);
       })
     );
 
     const result = await revertPaymentToPending('payment-1');
 
+    expect(rpcBody).toEqual({ p_payment_id: 'payment-1' });
     expect(result).toEqual(reverted);
-    expect(loanPatchBody).toEqual({ status: 'active' });
+  });
+
+  it('propaga el error si la RPC falla', async () => {
+    server.use(
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/revert_payment`, () =>
+        HttpResponse.json({ message: 'pago no encontrado' }, { status: 500 })
+      )
+    );
+
+    await expect(revertPaymentToPending('payment-1')).rejects.toThrow('pago no encontrado');
   });
 });
 
