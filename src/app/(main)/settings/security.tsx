@@ -59,6 +59,29 @@ export default function SecuritySettingsScreen() {
           </Text>
         </View>
 
+        {/* Zona de peligro */}
+        <Text style={styles.sectionTitle}>Zona de peligro</Text>
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={() => router.push('/(main)/settings/delete-account')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.iconContainer, styles.iconContainerDanger]}>
+              <Text style={styles.icon}>🗑️</Text>
+            </View>
+            <View style={styles.itemContent}>
+              <Text style={[styles.itemTitle, styles.itemTitleDanger]}>
+                Eliminar cuenta
+              </Text>
+              <Text style={styles.itemSubtitle}>
+                Borra tu cuenta y todos tus datos de forma permanente
+              </Text>
+            </View>
+            <Text style={styles.arrow}>→</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={{ height: spacing.xl }} />
       </ScrollView>
     </SafeAreaView>
@@ -124,6 +147,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: spacing.md,
   },
+  iconContainerDanger: {
+    backgroundColor: colors.error + '15',
+  },
   icon: {
     fontSize: fontSize.lg,
   },
@@ -134,6 +160,9 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     fontWeight: fontWeight.medium,
     color: colors.text.primary,
+  },
+  itemTitleDanger: {
+    color: colors.error,
   },
   itemSubtitle: {
     fontSize: fontSize.sm,

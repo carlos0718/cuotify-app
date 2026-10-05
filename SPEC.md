@@ -7,7 +7,7 @@
 
 ---
 
-## 1. Problema
+## 1. Problema (Descripción)
 
 En Latinoamérica una porción enorme del crédito personal ocurre **fuera del sistema
 bancario**: se presta plata entre conocidos, con interés, en cuotas semanales o
@@ -36,7 +36,7 @@ plata *y* deben plata. Por eso la app tiene dos módulos paralelos e independien
 Cuando el prestatario también es usuario de Cuotify, ambas vistas se sincronizan
 (vinculación por DNI) y el préstamo aparece en modo lectura del lado del deudor.
 
-## 3. Usuarios y roles
+## 3. Usuarios y roles (Usuarios objetivo)
 
 | Rol | Valor en `profiles.role` | Qué puede hacer |
 |---|---|---|
@@ -49,7 +49,7 @@ Cuando el prestatario también es usuario de Cuotify, ambas vistas se sincroniza
 
 ---
 
-## 4. Modelo de dominio (DDD)
+## 4. Modelo de dominio — Entidades y relaciones (DDD)
 
 ### 4.1 Lenguaje ubicuo
 
@@ -142,7 +142,12 @@ PersonalDebt: active ──► completed | cancelled ──► [delete permitido
 
 ---
 
-## 5. Features
+## 5. Features — MVP
+
+> Este proyecto no usa el esquema `RF-N`/`US-N` del template (features con ID + User Stories
+> propias) — usa Finding IDs (`S*`/`L*`/`A*`/`U*`/`P*`) como esquema de trazabilidad, documentado
+> en § 10 "Historial de cambios". Por eso no hay una sección "User Stories clave" separada: cada
+> bullet de abajo ya es la unidad de trazabilidad, y las nuevas se taguean con su Finding ID.
 
 Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pendiente
 
@@ -153,7 +158,13 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - ✅ Edición de perfil (nombre, DNI, teléfono, rol)
 - ✅ Bloqueo biométrico de la app (`expo-local-authentication`)
 - ⏳ Login social (Google / Apple) — requisito de App Store si se agrega otro social
-- ⏳ Eliminación de cuenta y export de datos (requisito de Google Play y GDPR)
+- ✅ Eliminación de cuenta (requisito de Google Play y GDPR) — reautenticación con
+  contraseña → confirmación explícita → Edge Function `delete-account` borra los
+  objetos del usuario en Storage y llama `auth.admin.deleteUser`, que cascadea el
+  borrado del resto de las tablas por las FKs `ON DELETE CASCADE` ya existentes
+  (ver § 5.9). Falta publicar la política de privacidad en una URL pública (ver § 8, R8)
+- ⏳ Export de datos personales (portabilidad GDPR) — fuera de alcance de este cambio,
+  queda pendiente aparte
 
 ### 5.2 Préstamos (rol prestamista)
 - ✅ Alta en 3 pasos: datos del prestatario → condiciones → mora y preview
@@ -186,7 +197,9 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - ✅ Revertir cuota pagada con vuelta del préstamo a `active`
 - ✅ Cálculo de mora por cuota con período de gracia
 - ✅ Calendario mensual con cuotas marcadas por color de préstamo
-- 🟡 La mora se recalcula **solo al abrir la pantalla del préstamo** — no hay job periódico
+- ✅ La mora se recalcula por **cron diario** (`pg_cron` → `recalculate_overdue_penalties`,
+  migración 013) sobre todos los pagos vencidos; el detalle la refresca on-demand al abrir.
+  Cálculo único en SQL (L7, requiere aplicar la migración)
 - ⏳ Registro de pagos parciales y de pagos adelantados
 
 ### 5.5 Notificaciones
@@ -239,10 +252,13 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 |---|---|---|---|
 | `generate_debt_payment_schedule` | RPC (Postgres function) | `007_add_monthly_interest_rpc.sql` y siguientes | `personalDebts.ts` al crear una deuda |
 | `get_monthly_interest_earned` | RPC | `007_add_monthly_interest_rpc.sql` | Dashboard prestamista (§ 5.6, gráfico pendiente) |
+| `recalculate_overdue_penalties` | RPC + cron (`pg_cron`) | `013_add_penalty_cron.sql` | Cron diario (todos los préstamos) + refresco on-demand del detalle (un préstamo) — única fuente de verdad del cálculo de mora (§ 5.4, L7) |
 | `after_loan_insert` (trigger, no RPC invocable) | Trigger de DB | `001_initial_schema.sql` | Se dispara solo al insertar en `loans` |
-| `analyze-loans-document` | Edge Function (Deno) | `supabase/functions/analyze-loans-document/` | Importación de préstamos en lote con Gemini (§ 5.2) |
-| `analyze-credit-card` | Edge Function (Deno) | `supabase/functions/analyze-credit-card/` | Import de resumen de tarjeta con IA (§ 5.3) |
+| `increment_ai_usage` | RPC (`SECURITY DEFINER`) | `015_add_ai_usage_rate_limit.sql` | Rate limiting de los análisis con IA: incrementa el contador diario por usuario en `ai_analysis_usage` y señala si se superó el límite (S10) |
+| `analyze-loans-document` | Edge Function (Deno) | `supabase/functions/analyze-loans-document/` | Importación de préstamos en lote con Gemini (§ 5.2) — verifica el JWT, límite de 10 MB y rate limit diario vía `increment_ai_usage` (S9/S10) |
+| `analyze-credit-card` | Edge Function (Deno) | `supabase/functions/analyze-credit-card/` | Import de resumen de tarjeta con IA (§ 5.3) — mismas guardas de JWT, tamaño y rate limit (S9/S10) |
 | `send-payment-reminders` | Edge Function (Deno) | `supabase/functions/send-payment-reminders/` | Envío server-side de recordatorios (§ 5.5) — sin cron automático todavía |
+| `delete-account` | Edge Function (Deno) | `supabase/functions/delete-account/` | Botón "Eliminar cuenta" en Ajustes → Seguridad (§ 5.1) — verifica el JWT del usuario, borra sus objetos en Storage y llama `auth.admin.deleteUser` |
 
 ---
 
@@ -262,7 +278,7 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 
 ---
 
-## 7. Criterios de aceptación
+## 7. Criterios de aceptación — MVP listo cuando:
 
 ### Cerrados
 - [x] Un prestamista puede crear un préstamo y ver el cronograma completo generado
@@ -274,6 +290,11 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - [x] El usuario free ve el paywall al intentar crear el 4° préstamo activo
 - [x] El cronograma se puede exportar a PDF y compartir (Pro)
 - [x] La app se puede bloquear con biometría
+- [x] Un usuario puede eliminar su cuenta; sus préstamos, deudas, cuotas,
+      notificaciones y comprobantes se borran en cascada
+- [x] La eliminación de cuenta exige reautenticación con contraseña y una
+      confirmación explícita antes de ejecutarse
+- [x] La mora se actualiza sin necesidad de abrir la pantalla del préstamo (cron diario, L7)
 
 ### Abiertos
 - [ ] Un prestatario vinculado **no puede** modificar el estado de sus propias cuotas
@@ -281,7 +302,6 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - [ ] El límite del plan free cuenta solo los préstamos donde el usuario es prestamista
 - [ ] El préstamo abierto (`open`) se crea y se lee correctamente contra el schema real
 - [ ] Los totales del dashboard no mezclan ARS con USD
-- [ ] La mora se actualiza sin necesidad de abrir la pantalla del préstamo
 - [ ] Las pantallas principales son navegables con lector de pantalla
 - [ ] Un crash en cualquier pantalla no deja la app en blanco (ErrorBoundary)
 - [ ] `supabase/migrations/` reproduce exactamente el schema de producción
@@ -299,14 +319,14 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 | R5 | **Suma de monedas**: ARS y USD se agregan en el mismo total sin conversión | Medio | Abierto |
 | R6 | **Sin tests**: toda la lógica financiera (interés, amortización, mora) sin cobertura | Alto | Abierto |
 | R7 | **Duplicación de lógica**: el cálculo de cuotas existe en TS y en PL/pgSQL; pueden divergir | Medio | Abierto |
-| R8 | **Cumplimiento de stores**: falta eliminación de cuenta (Google Play) y política de privacidad publicada | Bloqueante para launch | Abierto |
+| R8 | **Cumplimiento de stores**: falta eliminación de cuenta (Google Play) y política de privacidad publicada | Bloqueante para launch | Eliminación de cuenta en desarrollo (§ 5.1); política de privacidad todavía sin URL pública (hoy solo existe como texto in-app en Ajustes) |
 
 > El análisis completo con ubicación exacta de cada hallazgo y su fix propuesto
 > está en **`docs/IMPROVEMENTS.md`**.
 
 ---
 
-## 9. Fuera de alcance (por ahora)
+## 9. Fuera de alcance (v1)
 
 - Procesamiento real de pagos (pasarelas, transferencias dentro de la app)
 - Scoring crediticio o buró de morosos compartido entre prestamistas
@@ -324,3 +344,5 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 |---|---|---|
 | 2026-08-10 | Adopción del proyecto con `rocky-spec` (entonces `charlydev-flow`) — SPEC reconstruido desde el código existente | — |
 | 2026-09-11 | `.rocky-spec` actualizado a v0.20.0 — SPEC.md, AGENTS.md, CLAUDE.md, OBSERVABILITY.md, CHANGELOG.md y TODO.md alineados al template vigente (drift de contenido resuelto) | — |
+| 2026-09-29 | Agregado el flujo de eliminación de cuenta al dominio (§ 5.1) y a los contratos de API (§ 5.9) — implementación en curso | S8 |
+| 2026-10-02 | Recálculo de mora movido a cron SQL (`recalculate_overdue_penalties`, migración 013) — cierra el criterio "la mora se actualiza sin abrir la pantalla" (§ 7); cálculo único en SQL | L7 |

@@ -1,9 +1,7 @@
-import { useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import RevenueCatUI from 'react-native-purchases-ui';
 import { colors } from '../../../theme';
+import { useCustomerCenter } from '../../../hooks';
 
 /**
  * Customer Center — pantalla gestionada por RevenueCat que permite al usuario:
@@ -16,17 +14,7 @@ import { colors } from '../../../theme';
  * Se accede desde Settings → Mi Plan (solo si el usuario es premium)
  */
 export default function CustomerCenterScreen() {
-  const openCustomerCenter = async () => {
-    try {
-      await RevenueCatUI.presentCustomerCenter();
-    } finally {
-      router.back();
-    }
-  };
-
-  useEffect(() => {
-    openCustomerCenter();
-  }, []);
+  useCustomerCenter();
 
   return (
     <SafeAreaView style={styles.container}>

@@ -1,0 +1,84 @@
+import { useEffect, useRef } from 'react';
+import { router } from 'expo-router';
+import { useAuthStore, useSubscriptionStore } from '../store';
+import { initializePurchases } from '../services/subscription';
+import {
+  registerForPushNotifications,
+  savePushToken,
+  addNotificationReceivedListener,
+  addNotificationResponseListener,
+  updateBadgeCount,
+} from '../services/notifications';
+
+type NotificationSubscription = { remove: () => void };
+
+/**
+ * Inicializa la app al arrancar: sesión de auth, RevenueCat + listener en
+ * tiempo real, registro de push notifications, badge de pagos vencidos, y
+ * el routing al tocar una notificación. Devuelve `isInitialized` para que
+ * el layout raíz decida cuándo ya puede renderizar el árbol de navegación.
+ */
+export function useAppBootstrap() {
+  const { initialize, isInitialized, user } = useAuthStore();
+  const { startListening } = useSubscriptionStore();
+  const notificationListener = useRef<NotificationSubscription | null>(null);
+  const responseListener = useRef<NotificationSubscription | null>(null);
+
+  // Inicializar auth
+  useEffect(() => {
+    initialize();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Configurar notificaciones cuando el usuario está autenticado
+  useEffect(() => {
+    if (!user) return;
+
+    // Inicializar RevenueCat y arrancar listener en tiempo real
+    let stopListening: (() => void) | undefined;
+    initializePurchases(user.id).then(() => {
+      stopListening = startListening();
+    });
+
+    // Registrar para push notifications
+    registerForPushNotifications().then((token) => {
+      if (token) {
+        savePushToken(user.id, token);
+      }
+    });
+
+    // Actualizar badge con pagos vencidos
+    updateBadgeCount();
+
+    // Listener cuando llega una notificación (app en primer plano)
+    notificationListener.current = addNotificationReceivedListener((notification) => {
+      console.log('Notificación recibida:', notification);
+    });
+
+    // Listener cuando el usuario toca una notificación
+    responseListener.current = addNotificationResponseListener((response) => {
+      const data = response.notification.request.content.data;
+      console.log('Usuario tocó notificación:', data);
+
+      // Navegar según el tipo de notificación
+      if (data?.type === 'payment_reminder' || data?.type === 'payment_overdue') {
+        if (data?.loanId) {
+          router.push(`/(main)/loans/${data.loanId}`);
+        }
+      } else if (data?.type === 'borrower_comment') {
+        if (data?.loanId) {
+          router.push(`/(main)/loans/${data.loanId}`);
+        }
+      }
+    });
+
+    // Cleanup
+    return () => {
+      stopListening?.();
+      notificationListener.current?.remove();
+      responseListener.current?.remove();
+    };
+  }, [user]);
+
+  return { isInitialized };
+}

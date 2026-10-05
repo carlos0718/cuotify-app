@@ -1,41 +1,10 @@
-import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal as RNModal, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
-import { getLoanById, getPaymentsByLoan, markPaymentAsPaid, revertPaymentToPending, deleteLoan } from '../../../services/supabase';
-import { calculateLatePenalty } from '../../../services/calculations';
-import { cancelPaymentNotification, updateBadgeCount } from '../../../services/notifications';
-import { generateLoanPDF } from '../../../services/pdf/loanPdf';
-import { useSubscriptionStore } from '../../../store';
-import { useToast, Modal } from '../../../components';
+import { useLocalSearchParams, router } from 'expo-router';
+import { Modal } from '../../../components';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
-import { Borrower, Payment, LatePenaltyType } from '../../../types';
-
-interface LoanDetail {
-  id: string;
-  principal_amount: number;
-  interest_rate: number;
-  term_value: number | null;
-  term_type: 'weeks' | 'months';
-  interest_type?: 'simple' | 'french' | 'open';
-  currency: 'ARS' | 'USD';
-  payment_amount: number;
-  total_amount: number;
-  total_interest: number;
-  delivery_date: string;
-  first_payment_date: string;
-  end_date: string | null;
-  status: 'active' | 'completed' | 'defaulted' | 'cancelled';
-  borrower: Borrower | null;
-  lender: { id: string; full_name: string } | null;
-  notes?: string | null;
-  transfer_proof_url?: string | null;
-  grace_period_days: number;
-  late_penalty_type: LatePenaltyType;
-  late_penalty_rate: number;
-}
-
-type PaymentStatus = 'pending' | 'paid' | 'overdue';
+import { Payment, LatePenaltyType } from '../../../types';
+import { useLoanDetail, PaymentStatus } from '../../../hooks';
 
 // Componente de item de pago
 function PaymentItem({
@@ -50,24 +19,22 @@ function PaymentItem({
   penaltyConfig: {
     gracePeriodDays: number;
     latePenaltyType: LatePenaltyType;
-    latePenaltyRate: number;
   };
 }) {
   const today = new Date().toISOString().split('T')[0];
-  const isOverdue = payment.status === 'pending' && payment.due_date < today;
+  const isOverdue =
+    payment.status === 'overdue' || (payment.status === 'pending' && payment.due_date < today);
 
   const status: PaymentStatus = payment.status === 'paid' ? 'paid' : isOverdue ? 'overdue' : 'pending';
 
-  // Calcular penalización si está vencido
-  const penaltyResult = isOverdue && penaltyConfig.latePenaltyType !== 'none'
-    ? calculateLatePenalty({
-        dueDate: new Date(payment.due_date),
-        paymentAmount: payment.total_amount,
-        gracePeriodDays: penaltyConfig.gracePeriodDays,
-        latePenaltyType: penaltyConfig.latePenaltyType,
-        latePenaltyRate: penaltyConfig.latePenaltyRate,
-      })
-    : null;
+  // Info de atraso para el display (solo aritmética de fechas). El MONTO de mora lo
+  // calcula y persiste la función SQL recalculate_overdue_penalties (migración 013,
+  // finding L7) — acá se lee payment.penalty_amount, no se recalcula en el cliente.
+  const hasPenaltyConfig = penaltyConfig.latePenaltyType !== 'none';
+  const daysOverdue = isOverdue
+    ? Math.floor((Date.parse(today) - Date.parse(payment.due_date)) / 86400000)
+    : 0;
+  const daysAfterGrace = Math.max(0, daysOverdue - penaltyConfig.gracePeriodDays);
 
   const statusConfig = {
     pending: { color: colors.warning, label: 'Pendiente', bg: colors.warning + '20' },
@@ -94,7 +61,7 @@ function PaymentItem({
     }).format(amount);
   };
 
-  const penaltyAmount = penaltyResult?.penaltyAmount || payment.penalty_amount || 0;
+  const penaltyAmount = payment.penalty_amount || 0;
 
   return (
     <View style={styles.paymentItem}>
@@ -109,14 +76,14 @@ function PaymentItem({
             <Text style={styles.penaltyAmount}>+{formatCurrency(penaltyAmount)}</Text>
           )}
         </View>
-        {penaltyResult && penaltyResult.daysAfterGrace > 0 && (
+        {hasPenaltyConfig && isOverdue && daysAfterGrace > 0 && (
           <Text style={styles.penaltyInfo}>
-            Mora: {penaltyResult.daysOverdue} días de atraso
+            Mora: {daysOverdue} días de atraso
           </Text>
         )}
-        {penaltyResult && penaltyResult.isOverdue && penaltyResult.daysAfterGrace === 0 && (
+        {hasPenaltyConfig && isOverdue && daysAfterGrace === 0 && (
           <Text style={styles.graceInfo}>
-            En período de gracia ({penaltyConfig.gracePeriodDays - penaltyResult.daysOverdue} días restantes)
+            En período de gracia ({penaltyConfig.gracePeriodDays - daysOverdue} días restantes)
           </Text>
         )}
       </View>
@@ -136,163 +103,31 @@ function PaymentItem({
 export default function LoanDetailScreen() {
   const { id, readonly } = useLocalSearchParams<{ id: string; readonly?: string }>();
   const isReadOnly = readonly === 'true';
-  const [loan, setLoan] = useState<LoanDetail | null>(null);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<{ payment: Payment; status: PaymentStatus; penaltyAmount: number } | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showProofModal, setShowProofModal] = useState(false);
-  const { showSuccess, showError } = useToast();
-  const { premium } = useSubscriptionStore();
-
-  const loadData = async () => {
-    if (!id) return;
-
-    try {
-      const [loanData, paymentsData] = await Promise.all([
-        getLoanById(id),
-        getPaymentsByLoan(id),
-      ]);
-      setLoan(loanData as LoanDetail);
-      setPayments(paymentsData as Payment[]);
-    } catch (error) {
-      console.error('Error loading loan:', error);
-      showError('Error', 'No se pudo cargar el préstamo');
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [id])
-  );
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
-  };
-
-  const handlePaymentPress = (payment: Payment, status: PaymentStatus, penaltyAmount: number) => {
-    setSelectedPayment({ payment, status, penaltyAmount });
-  };
-
-  const handleMarkPaid = async () => {
-    if (!selectedPayment) return;
-
-    setIsProcessing(true);
-    try {
-      await markPaymentAsPaid(selectedPayment.payment.id, selectedPayment.payment.total_amount);
-      await cancelPaymentNotification(selectedPayment.payment.id);
-      updateBadgeCount();
-      showSuccess('Pago registrado', 'El pago ha sido marcado como pagado');
-      setSelectedPayment(null);
-      loadData();
-    } catch (error) {
-      showError('Error', 'No se pudo registrar el pago');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleRevertPayment = async () => {
-    if (!selectedPayment) return;
-
-    setIsProcessing(true);
-    try {
-      await revertPaymentToPending(selectedPayment.payment.id);
-      showSuccess('Pago revertido', 'El pago ha sido marcado como pendiente');
-      setSelectedPayment(null);
-      loadData();
-    } catch (error) {
-      showError('Error', 'No se pudo revertir el pago');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const closeModal = () => {
-    if (!isProcessing) {
-      setSelectedPayment(null);
-    }
-  };
-
-  const handleExportPDF = async () => {
-    if (!loan) return;
-    if (!premium) {
-      router.push('/(main)/settings/premium');
-      return;
-    }
-    setIsExporting(true);
-    try {
-      await generateLoanPDF(loan as unknown as Parameters<typeof generateLoanPDF>[0], payments as Parameters<typeof generateLoanPDF>[1]);
-    } catch {
-      showError('Error', 'No se pudo generar el PDF');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleWhatsApp = () => {
-    if (!loan) return;
-    if (!premium) {
-      router.push('/(main)/settings/premium');
-      return;
-    }
-    const phone = loan.borrower?.phone?.replace(/\D/g, '');
-    if (!phone) {
-      showError('Sin teléfono', 'El prestatario no tiene un número registrado');
-      return;
-    }
-    const nextPending = payments.find((p) => p.status !== 'paid');
-    const msg = nextPending
-      ? `Hola ${loan.borrower?.full_name ?? ''}, te recuerdo que tu cuota #${nextPending.payment_number} vence el ${nextPending.due_date}. — Cuotify`
-      : `Hola ${loan.borrower?.full_name ?? ''}, tu préstamo está al día. ¡Gracias! — Cuotify`;
-    const { Linking } = require('react-native');
-    Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
-  };
-
-  const handleDeleteLoan = () => {
-    if (!loan) return;
-    setShowDeleteModal(true);
-  };
-
-  const confirmDeleteLoan = async () => {
-    if (!loan) return;
-    setIsProcessing(true);
-    try {
-      await deleteLoan(loan.id);
-      showSuccess('Préstamo eliminado', 'El préstamo ha sido eliminado correctamente');
-      router.back();
-    } catch (error) {
-      showError('Error', error instanceof Error ? error.message : 'No se pudo eliminar el préstamo');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: loan?.currency || 'ARS',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '—';
-    const date = new Date(dateStr + 'T12:00:00');
-    return date.toLocaleDateString('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  };
+  const {
+    loan,
+    payments,
+    isLoading,
+    isProcessing,
+    isExporting,
+    refreshing,
+    selectedPayment,
+    showDeleteModal,
+    setShowDeleteModal,
+    showProofModal,
+    setShowProofModal,
+    premium,
+    onRefresh,
+    handlePaymentPress,
+    handleMarkPaid,
+    handleRevertPayment,
+    closeModal,
+    handleExportPDF,
+    handleWhatsApp,
+    handleDeleteLoan,
+    confirmDeleteLoan,
+    formatCurrency,
+    formatDate,
+  } = useLoanDetail(id, isReadOnly);
 
   if (isLoading) {
     return (
@@ -491,7 +326,6 @@ export default function LoanDetailScreen() {
                 penaltyConfig={{
                   gracePeriodDays: loan.grace_period_days || 7,
                   latePenaltyType: loan.late_penalty_type || 'none',
-                  latePenaltyRate: loan.late_penalty_rate || 0,
                 }}
               />
             ))

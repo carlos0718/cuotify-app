@@ -1,6 +1,5 @@
 import { supabase, handleSupabaseError } from './client';
 import { Borrower, Loan, BorrowerInsert, LoanInsert, Payment, CurrencyType } from '../../types';
-import { calculateLatePenalty } from '../calculations';
 
 // =============================================
 // PRESTATARIOS (Borrowers)
@@ -423,85 +422,26 @@ export async function getPaymentsByLoan(loanId: string): Promise<Payment[]> {
 }
 
 export async function markPaymentAsPaid(paymentId: string, paidAmount: number) {
-  // 1. Obtener el pago para saber el loan_id
-  const { data: payment, error: paymentError } = await supabase
-    .from('payments')
-    .select('loan_id')
-    .eq('id', paymentId)
-    .single();
-
-  if (paymentError) throw new Error(handleSupabaseError(paymentError));
-
-  const loanId = (payment as { loan_id: string }).loan_id;
-
-  // 2. Actualizar el pago
-  const { data, error } = await supabase
-    .from('payments')
-    .update({
-      status: 'paid',
-      paid_amount: paidAmount,
-      paid_date: new Date().toISOString().split('T')[0],
-    })
-    .eq('id', paymentId)
-    .select()
-    .single();
+  // RPC transaccional (L8): actualiza la cuota y, si todas quedan pagadas,
+  // completa el préstamo en una sola transacción. Ver migración 014.
+  const { data, error } = await supabase.rpc('mark_payment_paid', {
+    p_payment_id: paymentId,
+    p_paid_amount: paidAmount,
+  });
 
   if (error) throw new Error(handleSupabaseError(error));
-
-  // 3. Verificar si todos los pagos del préstamo están pagados
-  const { data: allPayments, error: allPaymentsError } = await supabase
-    .from('payments')
-    .select('status')
-    .eq('loan_id', loanId);
-
-  if (allPaymentsError) throw new Error(handleSupabaseError(allPaymentsError));
-
-  const paymentsList = (allPayments || []) as { status: string }[];
-  const allPaid = paymentsList.every(p => p.status === 'paid');
-
-  // 4. Si todos están pagados, actualizar el préstamo a 'completed'
-  if (allPaid) {
-    await supabase
-      .from('loans')
-      .update({ status: 'completed' })
-      .eq('id', loanId);
-  }
 
   return data;
 }
 
 export async function revertPaymentToPending(paymentId: string) {
-  // 1. Obtener el pago para saber el loan_id
-  const { data: payment, error: paymentError } = await supabase
-    .from('payments')
-    .select('loan_id')
-    .eq('id', paymentId)
-    .single();
-
-  if (paymentError) throw new Error(handleSupabaseError(paymentError));
-
-  const loanId = (payment as { loan_id: string }).loan_id;
-
-  // 2. Actualizar el pago a pendiente
-  const { data, error } = await supabase
-    .from('payments')
-    .update({
-      status: 'pending',
-      paid_amount: 0,
-      paid_date: null,
-    })
-    .eq('id', paymentId)
-    .select()
-    .single();
+  // RPC transaccional (L8): revierte la cuota a pendiente y reactiva el
+  // préstamo si estaba completado, de forma atómica. Ver migración 014.
+  const { data, error } = await supabase.rpc('revert_payment', {
+    p_payment_id: paymentId,
+  });
 
   if (error) throw new Error(handleSupabaseError(error));
-
-  // 3. Si el préstamo estaba completado, volver a estado activo
-  await supabase
-    .from('loans')
-    .update({ status: 'active' })
-    .eq('id', loanId)
-    .eq('status', 'completed');
 
   return data;
 }
@@ -700,161 +640,29 @@ export async function getLoanStats(): Promise<LoanStats> {
 // PENALIZACIONES POR MORA
 // =============================================
 
-interface PaymentWithLoan {
-  id: string;
-  due_date: string;
-  total_amount: number;
-  status: string;
-  penalty_amount: number;
-  loan: {
-    grace_period_days: number;
-    late_penalty_type: 'none' | 'fixed' | 'daily' | 'weekly';
-    late_penalty_rate: number;
-  };
-}
-
 /**
- * Calcula y actualiza la penalización de un pago específico
- */
-export async function updatePaymentPenalty(paymentId: string): Promise<Payment> {
-  // 1. Obtener el pago con los datos del préstamo
-  const { data: payment, error: paymentError } = await supabase
-    .from('payments')
-    .select(`
-      id,
-      due_date,
-      total_amount,
-      status,
-      penalty_amount,
-      loan:loans(
-        grace_period_days,
-        late_penalty_type,
-        late_penalty_rate
-      )
-    `)
-    .eq('id', paymentId)
-    .single();
-
-  if (paymentError) throw new Error(handleSupabaseError(paymentError));
-
-  const paymentData = payment as unknown as PaymentWithLoan;
-
-  // Si ya está pagado o el préstamo no tiene penalización configurada, no hacer nada
-  if (paymentData.status === 'paid' || paymentData.loan.late_penalty_type === 'none') {
-    const { data: currentPayment, error } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('id', paymentId)
-      .single();
-
-    if (error) throw new Error(handleSupabaseError(error));
-    return currentPayment as Payment;
-  }
-
-  // 2. Calcular la penalización
-  const penaltyResult = calculateLatePenalty({
-    dueDate: new Date(paymentData.due_date),
-    paymentAmount: paymentData.total_amount,
-    gracePeriodDays: paymentData.loan.grace_period_days,
-    latePenaltyType: paymentData.loan.late_penalty_type,
-    latePenaltyRate: paymentData.loan.late_penalty_rate,
-  });
-
-  // 3. Actualizar el pago con la penalización
-  const { data: updatedPayment, error: updateError } = await supabase
-    .from('payments')
-    .update({
-      penalty_amount: penaltyResult.penaltyAmount,
-      penalty_calculated_at: new Date().toISOString(),
-      status: penaltyResult.isOverdue && paymentData.status === 'pending' ? 'overdue' : paymentData.status,
-    })
-    .eq('id', paymentId)
-    .select()
-    .single();
-
-  if (updateError) throw new Error(handleSupabaseError(updateError));
-  return updatedPayment as Payment;
-}
-
-/**
- * Actualiza las penalizaciones de todos los pagos pendientes de un préstamo
+ * Refresca la mora de un préstamo y devuelve sus pagos actualizados.
+ *
+ * El cálculo vive en la función SQL `recalculate_overdue_penalties` (migración 013,
+ * finding L7) — única fuente de verdad. Un cron diario la corre sobre todos los
+ * préstamos; acá se invoca para un préstamo puntual al abrir su detalle, para que
+ * el `penalty_amount` persistido esté fresco sin esperar a la próxima corrida.
  */
 export async function updateLoanPenalties(loanId: string): Promise<Payment[]> {
-  // 1. Obtener datos del préstamo
-  const { data: loan, error: loanError } = await supabase
-    .from('loans')
-    .select('grace_period_days, late_penalty_type, late_penalty_rate')
-    .eq('id', loanId)
-    .single();
+  const { error: rpcError } = await supabase.rpc('recalculate_overdue_penalties', {
+    p_loan_id: loanId,
+  });
 
-  if (loanError) throw new Error(handleSupabaseError(loanError));
+  if (rpcError) throw new Error(handleSupabaseError(rpcError));
 
-  const loanData = loan as {
-    grace_period_days: number;
-    late_penalty_type: 'none' | 'fixed' | 'daily' | 'weekly';
-    late_penalty_rate: number;
-  };
-
-  // Si no hay penalización configurada, retornar los pagos sin cambios
-  if (loanData.late_penalty_type === 'none') {
-    const { data: payments, error } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('loan_id', loanId)
-      .order('payment_number', { ascending: true });
-
-    if (error) throw new Error(handleSupabaseError(error));
-    return (payments || []) as Payment[];
-  }
-
-  // 2. Obtener pagos pendientes o vencidos
-  const { data: payments, error: paymentsError } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('loan_id', loanId)
-    .in('status', ['pending', 'overdue'])
-    .order('payment_number', { ascending: true });
-
-  if (paymentsError) throw new Error(handleSupabaseError(paymentsError));
-
-  const updatedPayments: Payment[] = [];
-
-  // 3. Calcular y actualizar cada pago
-  for (const payment of (payments || []) as Payment[]) {
-    const penaltyResult = calculateLatePenalty({
-      dueDate: new Date(payment.due_date),
-      paymentAmount: payment.total_amount,
-      gracePeriodDays: loanData.grace_period_days,
-      latePenaltyType: loanData.late_penalty_type,
-      latePenaltyRate: loanData.late_penalty_rate,
-    });
-
-    const newStatus = penaltyResult.isOverdue && payment.status === 'pending' ? 'overdue' : payment.status;
-
-    const { data: updatedPayment, error: updateError } = await supabase
-      .from('payments')
-      .update({
-        penalty_amount: penaltyResult.penaltyAmount,
-        penalty_calculated_at: new Date().toISOString(),
-        status: newStatus,
-      })
-      .eq('id', payment.id)
-      .select()
-      .single();
-
-    if (updateError) throw new Error(handleSupabaseError(updateError));
-    updatedPayments.push(updatedPayment as Payment);
-  }
-
-  // 4. Retornar todos los pagos del préstamo actualizados
-  const { data: allPayments, error: allError } = await supabase
+  const { data: payments, error } = await supabase
     .from('payments')
     .select('*')
     .eq('loan_id', loanId)
     .order('payment_number', { ascending: true });
 
-  if (allError) throw new Error(handleSupabaseError(allError));
-  return (allPayments || []) as Payment[];
+  if (error) throw new Error(handleSupabaseError(error));
+  return (payments || []) as Payment[];
 }
 
 // =============================================

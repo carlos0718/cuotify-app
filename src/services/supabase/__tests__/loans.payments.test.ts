@@ -1,0 +1,356 @@
+import { http, HttpResponse } from 'msw';
+import { server } from '../../../test/msw/server';
+import { supabase } from '../client';
+import {
+  markPaymentAsPaid,
+  revertPaymentToPending,
+  deleteLoan,
+  getActiveLoans,
+  getNextPendingPaymentDatesByLoan,
+  getLoanStats,
+  getLinkedLoanPaymentStats,
+  updateLoanPenalties,
+} from '../loans';
+
+const SUPABASE_URL = 'https://test.supabase.co';
+
+function makeLoan(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'loan-1',
+    borrower_id: 'borrower-1',
+    lender_id: 'lender-1',
+    status: 'active',
+    principal_amount: 1000,
+    total_amount: 1120,
+    total_interest: 120,
+    payment_amount: 93.33,
+    currency: 'ARS',
+    interest_rate: 12,
+    interest_type: 'simple',
+    term_type: 'months',
+    term_value: 12,
+    delivery_date: '2026-01-01',
+    first_payment_date: '2026-02-01',
+    end_date: null,
+    color_code: null,
+    grace_period_days: 3,
+    late_penalty_type: 'fixed',
+    late_penalty_rate: 5,
+    notes: null,
+    transfer_proof_url: null,
+    reminder_days_before: 3,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makePayment(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'payment-1',
+    loan_id: 'loan-1',
+    payment_number: 1,
+    due_date: '2026-02-01',
+    principal_portion: 80,
+    interest_portion: 13.33,
+    total_amount: 93.33,
+    status: 'pending',
+    paid_amount: null,
+    paid_date: null,
+    penalty_amount: 0,
+    penalty_calculated_at: null,
+    borrower_comment: null,
+    borrower_comment_date: null,
+    lender_note: null,
+    remaining_balance: 920,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+/** Permite que el mock de /rest/v1/profiles no sea necesario mockear a mano en cada test. */
+function mockNoLinkedProfile() {
+  server.use(http.get(`${SUPABASE_URL}/rest/v1/profiles`, () => HttpResponse.json([])));
+}
+
+// L8: la transición de estado del préstamo (completar / reactivar) ahora es atómica
+// dentro de las RPC `mark_payment_paid` / `revert_payment` (migración 014). Desde el
+// cliente se testea el contrato: args correctos, fila devuelta y propagación de errores.
+describe('markPaymentAsPaid', () => {
+  it('invoca la RPC mark_payment_paid con el pago y el monto, y devuelve la fila actualizada', async () => {
+    const updated = makePayment({ status: 'paid', paid_amount: 93.33 });
+    let rpcBody: Record<string, unknown> | null = null;
+
+    server.use(
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/mark_payment_paid`, async ({ request }) => {
+        rpcBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(updated);
+      })
+    );
+
+    const result = await markPaymentAsPaid('payment-1', 93.33);
+
+    expect(rpcBody).toEqual({ p_payment_id: 'payment-1', p_paid_amount: 93.33 });
+    expect(result).toEqual(updated);
+  });
+
+  it('propaga el error si la RPC falla', async () => {
+    server.use(
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/mark_payment_paid`, () =>
+        HttpResponse.json({ message: 'pago no encontrado' }, { status: 500 })
+      )
+    );
+
+    await expect(markPaymentAsPaid('payment-1', 93.33)).rejects.toThrow('pago no encontrado');
+  });
+});
+
+describe('revertPaymentToPending', () => {
+  it('invoca la RPC revert_payment con el pago y devuelve la fila revertida', async () => {
+    const reverted = makePayment({ status: 'pending', paid_amount: 0, paid_date: null });
+    let rpcBody: Record<string, unknown> | null = null;
+
+    server.use(
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/revert_payment`, async ({ request }) => {
+        rpcBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(reverted);
+      })
+    );
+
+    const result = await revertPaymentToPending('payment-1');
+
+    expect(rpcBody).toEqual({ p_payment_id: 'payment-1' });
+    expect(result).toEqual(reverted);
+  });
+
+  it('propaga el error si la RPC falla', async () => {
+    server.use(
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/revert_payment`, () =>
+        HttpResponse.json({ message: 'pago no encontrado' }, { status: 500 })
+      )
+    );
+
+    await expect(revertPaymentToPending('payment-1')).rejects.toThrow('pago no encontrado');
+  });
+});
+
+describe('deleteLoan', () => {
+  it('no permite eliminar un préstamo que no está completado', async () => {
+    server.use(
+      http.get(`${SUPABASE_URL}/rest/v1/loans`, () => HttpResponse.json(makeLoan({ status: 'active' })))
+    );
+    mockNoLinkedProfile();
+
+    let deleteCalled = false;
+    server.use(http.delete(`${SUPABASE_URL}/rest/v1/loans`, () => {
+      deleteCalled = true;
+      return new HttpResponse(null, { status: 204 });
+    }));
+
+    await expect(deleteLoan('loan-1')).rejects.toThrow('Solo se pueden eliminar préstamos completados');
+    expect(deleteCalled).toBe(false);
+  });
+
+  it('elimina el préstamo si está completado', async () => {
+    server.use(
+      http.get(`${SUPABASE_URL}/rest/v1/loans`, () => HttpResponse.json(makeLoan({ status: 'completed' })))
+    );
+    mockNoLinkedProfile();
+
+    let deleteCalled = false;
+    server.use(http.delete(`${SUPABASE_URL}/rest/v1/loans`, () => {
+      deleteCalled = true;
+      return new HttpResponse(null, { status: 204 });
+    }));
+
+    await expect(deleteLoan('loan-1')).resolves.toBeUndefined();
+    expect(deleteCalled).toBe(true);
+  });
+
+  it('propaga el error si el préstamo no existe', async () => {
+    // .single() sobre 0 filas devuelve un error de PostgREST (nunca `data: null`
+    // con status 200) — por eso el chequeo `if (!loan)` en deleteLoan es
+    // defensivo pero en la práctica este es el camino real de "no existe".
+    server.use(
+      http.get(`${SUPABASE_URL}/rest/v1/loans`, () =>
+        HttpResponse.json({ message: 'JSON object requested, multiple (or no) rows returned' }, { status: 406 })
+      )
+    );
+
+    await expect(deleteLoan('loan-inexistente')).rejects.toThrow();
+  });
+});
+
+describe('getActiveLoans', () => {
+  const authGetUser = jest.spyOn(supabase.auth, 'getUser');
+  afterEach(() => authGetUser.mockReset());
+
+  it('devuelve [] sin hacer requests si no hay usuario autenticado', async () => {
+    authGetUser.mockResolvedValue({ data: { user: null }, error: null } as never);
+    expect(await getActiveLoans()).toEqual([]);
+  });
+
+  it('filtra por lender_id del usuario autenticado (regresión L4: no debe traer préstamos donde es prestatario)', async () => {
+    authGetUser.mockResolvedValue({ data: { user: { id: 'lender-1' } }, error: null } as never);
+
+    let seenParams: URLSearchParams | null = null;
+    server.use(
+      http.get(`${SUPABASE_URL}/rest/v1/loans`, ({ request }) => {
+        seenParams = new URL(request.url).searchParams;
+        return HttpResponse.json([makeLoan()]);
+      })
+    );
+
+    await getActiveLoans();
+
+    expect(seenParams!.get('lender_id')).toBe('eq.lender-1');
+    expect(seenParams!.get('status')).toBe('eq.active');
+  });
+});
+
+describe('getNextPendingPaymentDatesByLoan', () => {
+  it('devuelve un objeto vacío sin hacer requests si no hay loanIds', async () => {
+    expect(await getNextPendingPaymentDatesByLoan([])).toEqual({});
+  });
+
+  it('se queda con la fecha más próxima por préstamo (la primera de cada loan_id, ya vienen ordenadas)', async () => {
+    server.use(
+      http.get(`${SUPABASE_URL}/rest/v1/payments`, () =>
+        HttpResponse.json([
+          { loan_id: 'loan-1', due_date: '2026-02-01' },
+          { loan_id: 'loan-2', due_date: '2026-02-05' },
+          { loan_id: 'loan-1', due_date: '2026-03-01' },
+        ])
+      )
+    );
+
+    const result = await getNextPendingPaymentDatesByLoan(['loan-1', 'loan-2']);
+
+    expect(result).toEqual({ 'loan-1': '2026-02-01', 'loan-2': '2026-02-05' });
+  });
+});
+
+describe('getLoanStats', () => {
+  const authGetUser = jest.spyOn(supabase.auth, 'getUser');
+  afterEach(() => authGetUser.mockReset());
+
+  it('separa los totales por moneda y solo cuenta totalLent de préstamos activos', async () => {
+    authGetUser.mockResolvedValue({ data: { user: { id: 'lender-1' } }, error: null } as never);
+
+    server.use(
+      http.get(`${SUPABASE_URL}/rest/v1/loans`, () =>
+        HttpResponse.json([
+          { id: 'loan-ars-active', status: 'active', total_amount: 1120, principal_amount: 1000, currency: 'ARS' },
+          { id: 'loan-ars-done', status: 'completed', total_amount: 500, principal_amount: 450, currency: 'ARS' },
+          { id: 'loan-usd-active', status: 'active', total_amount: 200, principal_amount: 180, currency: 'USD' },
+        ])
+      ),
+      http.get(`${SUPABASE_URL}/rest/v1/payments`, ({ request }) => {
+        const status = new URL(request.url).searchParams.get('status');
+        if (status === 'eq.paid') {
+          return HttpResponse.json([
+            { loan_id: 'loan-ars-active', paid_amount: 100 },
+            { loan_id: 'loan-ars-done', paid_amount: 500 },
+          ]);
+        }
+        // status === 'eq.pending'
+        return HttpResponse.json([
+          { loan_id: 'loan-ars-active', total_amount: 1020, penalty_amount: 10 },
+          { loan_id: 'loan-usd-active', total_amount: 200, penalty_amount: 0 },
+        ]);
+      })
+    );
+
+    const stats = await getLoanStats();
+
+    expect(stats.activeLoans).toBe(2);
+    expect(stats.completedLoans).toBe(1);
+    expect(stats.currencies.sort()).toEqual(['ARS', 'USD']);
+
+    expect(stats.byCurrency.ARS.totalLent).toBe(1000); // solo el activo
+    expect(stats.byCurrency.ARS.totalExpected).toBe(1620); // 1120 + 500
+    expect(stats.byCurrency.ARS.totalRecovered).toBe(600); // 100 + 500
+    expect(stats.byCurrency.ARS.totalPending).toBe(1030); // 1020 + 10
+
+    expect(stats.byCurrency.USD.totalLent).toBe(180);
+    expect(stats.byCurrency.USD.totalExpected).toBe(200);
+    expect(stats.byCurrency.USD.totalRecovered).toBe(0);
+    expect(stats.byCurrency.USD.totalPending).toBe(200);
+  });
+
+  it('no consulta payments si el lender no tiene préstamos', async () => {
+    authGetUser.mockResolvedValue({ data: { user: { id: 'lender-1' } }, error: null } as never);
+    server.use(http.get(`${SUPABASE_URL}/rest/v1/loans`, () => HttpResponse.json([])));
+
+    const stats = await getLoanStats();
+
+    expect(stats.totalLoans).toBe(0);
+    expect(stats.currencies).toEqual([]);
+    expect(stats.byCurrency.ARS).toEqual({ totalLent: 0, totalExpected: 0, totalRecovered: 0, totalPending: 0 });
+  });
+});
+
+describe('getLinkedLoanPaymentStats', () => {
+  it('devuelve todo en cero sin hacer requests si no hay loanIds', async () => {
+    const result = await getLinkedLoanPaymentStats([]);
+    expect(result.ARS).toEqual({ totalToPay: 0, totalPaid: 0, remainingToPay: 0 });
+    expect(result.USD).toEqual({ totalToPay: 0, totalPaid: 0, remainingToPay: 0 });
+  });
+
+  it('separa los totales por moneda usando la moneda heredada del préstamo', async () => {
+    server.use(
+      http.get(`${SUPABASE_URL}/rest/v1/loans`, () =>
+        HttpResponse.json([
+          { id: 'loan-1', currency: 'ARS' },
+          { id: 'loan-2', currency: 'USD' },
+        ])
+      ),
+      http.get(`${SUPABASE_URL}/rest/v1/payments`, () =>
+        HttpResponse.json([
+          { loan_id: 'loan-1', total_amount: 100, paid_amount: 100, status: 'paid' },
+          { loan_id: 'loan-1', total_amount: 100, paid_amount: 0, status: 'pending' },
+          { loan_id: 'loan-2', total_amount: 50, paid_amount: 0, status: 'pending' },
+        ])
+      )
+    );
+
+    const result = await getLinkedLoanPaymentStats(['loan-1', 'loan-2']);
+
+    expect(result.ARS).toEqual({ totalToPay: 200, totalPaid: 100, remainingToPay: 100 });
+    expect(result.USD).toEqual({ totalToPay: 50, totalPaid: 0, remainingToPay: 50 });
+  });
+});
+
+describe('updateLoanPenalties', () => {
+  it('invoca el RPC de recálculo de mora para el préstamo y devuelve sus pagos actualizados', async () => {
+    const finalList = [
+      makePayment({ id: 'p1', status: 'overdue', penalty_amount: 5 }),
+      makePayment({ id: 'p2', status: 'overdue', penalty_amount: 10 }),
+    ];
+    let rpcBody: Record<string, unknown> | null = null;
+
+    server.use(
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/recalculate_overdue_penalties`, async ({ request }) => {
+        rpcBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(null);
+      }),
+      http.get(`${SUPABASE_URL}/rest/v1/payments`, () => HttpResponse.json(finalList))
+    );
+
+    const result = await updateLoanPenalties('loan-1');
+
+    expect(rpcBody).toEqual({ p_loan_id: 'loan-1' });
+    expect(result).toEqual(finalList);
+  });
+
+  it('propaga el error si el RPC de recálculo falla', async () => {
+    server.use(
+      http.post(`${SUPABASE_URL}/rest/v1/rpc/recalculate_overdue_penalties`, () =>
+        HttpResponse.json({ message: 'recálculo de mora falló' }, { status: 500 })
+      )
+    );
+
+    await expect(updateLoanPenalties('loan-1')).rejects.toThrow('recálculo de mora falló');
+  });
+});

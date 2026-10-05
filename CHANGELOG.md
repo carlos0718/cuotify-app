@@ -20,6 +20,26 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 
 ### Security
 
+## [1.2.0] - 2026-10-05
+
+### Added
+- Eliminación de cuenta desde Ajustes → Seguridad → Zona de peligro: reautenticación con contraseña, doble confirmación y Edge Function `delete-account` que borra los comprobantes del usuario en Storage y llama `auth.admin.deleteUser`, cascadeando el resto de sus datos (S8)
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+- Marcar/revertir el pago de una cuota y la transición de estado del préstamo (completar / reactivar) no eran atómicos: se hacían en 3-4 round-trips sueltos desde el cliente, y un fallo intermedio dejaba el pago y el préstamo en estados inconsistentes — ahora ambos pasos ocurren en una sola transacción vía las RPC `mark_payment_paid` / `revert_payment` (L8). ⚠️ Requiere aplicar la migración `014_add_payment_transaction_rpcs.sql`
+- La mora solo se recalculaba al abrir la pantalla del préstamo (y `updateLoanPenalties`/`updatePaymentPenalty` eran código muerto, así que en la práctica no se persistía nunca) — ahora la calcula una función SQL (`recalculate_overdue_penalties`) que corre por cron diario sobre todos los pagos vencidos; el dashboard, el calendario y las notificaciones leen datos actualizados. Única fuente de verdad en SQL (L7). ⚠️ Requiere aplicar la migración `013_add_penalty_cron.sql`
+- Botón de mostrar/ocultar contraseña en `PasswordInput` sin `accessibilityLabel` ni `accessibilityRole` — un ícono SVG sin texto era invisible para VoiceOver/TalkBack (avance parcial de U1)
+
+### Security
+- Rate limiting y límite de tamaño en las Edge Functions de análisis con IA (`analyze-loans-document`, `analyze-credit-card`): ahora verifican el JWT del usuario (antes invocaban a Gemini sin identificarlo), rechazan archivos de más de 10 MB en el borde (413), y aplican un tope de 30 análisis por usuario por día vía la RPC `increment_ai_usage` sobre la tabla `ai_analysis_usage`, cortando con 429 sin gastar una llamada a Gemini — acota el costo descontrolado (S10, OWASP LLM10 Unbounded Consumption). Pre-chequeo de tamaño también en el cliente como UX. ⚠️ Requiere aplicar la migración `015_add_ai_usage_rate_limit.sql` y redeploy de ambas Edge Functions
+- Guarda contra prompt injection en las Edge Functions de análisis con IA (`analyze-loans-document`, `analyze-credit-card`): el prompt de extracción pasó a `system_instruction` de Gemini —separando las instrucciones del documento no confiable, que antes iba al mismo nivel que el prompt—, se agregó una cláusula explícita que marca el contenido del archivo como datos y no órdenes, y una validación de rango programática (con coerción numérica) que descarta valores absurdos al sanitizar, como segunda capa independiente del preview editable (S9, OWASP LLM01). ⚠️ Requiere redeploy de ambas Edge Functions
+
 ## [1.1.0] - 2026-09-12
 
 ### Added

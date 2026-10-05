@@ -2,7 +2,7 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
-## Project Overview
+## Project Overview (Overview del proyecto)
 
 **Cuotify** is a React Native / Expo mobile app for managing personal loans. It allows lenders to create and track loans, manage borrowers, and monitor payment schedules. Borrowers can view their own loans and add comments to payments.
 
@@ -25,7 +25,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 > Las variables de entorno nunca van al repo. `.env` está en `.gitignore`. Los secrets de producción se configuran en variables de entorno de EAS (`eas secret` o el bloque `env` del perfil correspondiente en `eas.json`).
 
-## Commands
+## Commands (Comandos útiles)
 
 ```bash
 # Start development server
@@ -47,7 +47,7 @@ Copy `.env.example` to `.env` and fill in:
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon key
 - `EXPO_PROJECT_ID` — Expo project ID (for push notifications)
 
-## Architecture
+## Architecture (Arquitectura)
 
 ### Routing (Expo Router file-based)
 
@@ -123,7 +123,12 @@ Each loan gets a pastel `color_code` from the `colors.loanColors` palette (`src/
 > El **qué** se eligió (stack, arquitectura) está arriba. Acá va el **por qué**.
 
 - **Arquitectura**: Layer-based (por capa técnica, no por feature) — la app tiene ~14 pantallas sobre dos dominios paralelos (préstamos/deudas) que comparten casi toda su infraestructura (un cliente Supabase, un motor de cálculo, un theme); feature-based hubiera duplicado ese plumbing. Ver el trade-off que esto paga hoy (extracción a `components/<feature>/`/`hooks/` incompleta) en la sección "Architecture — Layer-based" más abajo.
-- **TDD**: No — no hay tests configurados; se prioriza shippear el MVP y agregar tests a `loanCalculator.ts` cuando el cálculo de intereses/penalidades se toque (ver Testing en `TODO.md` § Calidad).
+- **TDD**: Sí, adoptado el 2026-09-29 (§ A11 del `TODO.md`) — Jest (`jest-expo`) ya estaba configurado
+  con CI en `.github/workflows/ci.yml`. El backfill de tests para código existente va por capas,
+  de adentro hacia afuera: lógica pura (`services/calculations/`, ya cubierto — A3) → `utils/` →
+  `services/supabase/` (mockeando el client) → `store/` (Zustand) → `components/ui/` → pantallas
+  críticas de `src/app/`. De acá en adelante, toda feature nueva o fix no trivial se escribe
+  test-first (red-green-refactor), no solo el backfill de lo ya existente.
 - **Versión desincronizada**: la versión del proyecto vive en dos lugares (`package.json` y `app.json`) y hoy están desalineados — unificarlos es la tarea § A9 del `TODO.md`.
 - **Licencia**: propietaria (ver `LICENSE`) — software privado, no se redistribuye.
 
