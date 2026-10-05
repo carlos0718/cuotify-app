@@ -105,6 +105,11 @@ AGREGADO: Prestatario
 - `Term` = `{ value: integer, type: 'weeks' | 'months' }`
 - `InterestPolicy` = `{ type: 'simple' | 'french' | 'open', annualRate: decimal }`
 - `PenaltyPolicy` = `{ type: 'none'|'fixed'|'daily'|'weekly', rate: decimal, graceDays: int }`
+- `ExchangeRate` = `{ type: 'oficial'|'blue'|'mep', buy: decimal, sell: decimal, date: ISODate }`
+  — **no es una entidad de DB**: es un valor de red (dolarapi.com) cacheado en el
+  dispositivo. La preferencia `dollarRateType` (qué tipo usar) vive en el
+  `preferencesStore` (AsyncStorage), no en Supabase. Solo se usa para **mostrar**
+  equivalencias; nunca se persiste un monto convertido.
 
 > **Deuda de diseño:** hoy estos VOs están aplanados como columnas sueltas y se
 > re-arman a mano en cada pantalla. Ver `docs/IMPROVEMENTS.md` § Lógica.
@@ -214,6 +219,11 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 ### 5.6 Dashboard y reportes
 - ✅ Dashboard prestamista: total prestado, recuperado, pendiente, activos, vencidos
 - ✅ Dashboard prestatario: deuda total, pagado, próxima cuota
+- ✅ Totales **separados por moneda** — ARS y USD nunca se suman en un mismo número (L2)
+- ✅ Cotización ARS/USD: equivalente de los totales (dashboard) y del monto del
+  préstamo/deuda (detalle) en la otra moneda, con la fecha de cotización visible.
+  Fuente en vivo (dolarapi.com) con caché y fallback offline; el usuario elige el tipo
+  de dólar (oficial / blue / MEP) en Ajustes (P4)
 - ✅ Export a PDF del cronograma (Pro)
 - ✅ Export CSV de préstamos, pagos, deudas y todo junto (Pro)
 - ✅ Recordatorio por WhatsApp con mensaje pre-armado (Pro)
@@ -274,7 +284,7 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 | **i18n** | ⏳ | Strings en español hardcodeados en las pantallas |
 | **Testing** | 🔴 | Sin tests, sin lint, sin CI |
 | **Observabilidad** | 🔴 | Sin crash reporting (Sentry) ni analytics |
-| **Moneda** | 🟡 | ARS y USD conviven pero **se suman sin conversión** en los totales del dashboard |
+| **Moneda** | ✅ | Totales separados por moneda (L2); equivalente ARS/USD con fecha de cotización en dashboard y detalle (P4, dolarapi.com) |
 
 ---
 
@@ -295,13 +305,15 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 - [x] La eliminación de cuenta exige reautenticación con contraseña y una
       confirmación explícita antes de ejecutarse
 - [x] La mora se actualiza sin necesidad de abrir la pantalla del préstamo (cron diario, L7)
+- [x] Los totales del dashboard no mezclan ARS con USD (L2)
+- [x] El dashboard y el detalle muestran el equivalente en la otra moneda con la fecha
+      de cotización, según el tipo de dólar elegido (P4)
 
 ### Abiertos
 - [ ] Un prestatario vinculado **no puede** modificar el estado de sus propias cuotas
 - [ ] Una tasa mensual alta (>83%) se guarda sin error de overflow numérico
 - [ ] El límite del plan free cuenta solo los préstamos donde el usuario es prestamista
 - [ ] El préstamo abierto (`open`) se crea y se lee correctamente contra el schema real
-- [ ] Los totales del dashboard no mezclan ARS con USD
 - [ ] Las pantallas principales son navegables con lector de pantalla
 - [ ] Un crash en cualquier pantalla no deja la app en blanco (ErrorBoundary)
 - [ ] `supabase/migrations/` reproduce exactamente el schema de producción
@@ -316,7 +328,7 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 | R2 | **Policy de RLS permisiva**: `"Los prestatarios pueden agregar comentarios"` es `FOR UPDATE` sin `WITH CHECK` → un prestatario puede marcar sus cuotas como pagadas | Alto | Abierto |
 | R3 | **Notificaciones sin control**: policy `WITH CHECK (true)` permite insertar notificaciones a cualquier `user_id` | Medio | Abierto |
 | R4 | **Overflow de `interest_rate`**: `DECIMAL(5,2)` vs tasa mensual ×12 validada hasta 999 | Medio | Abierto |
-| R5 | **Suma de monedas**: ARS y USD se agregan en el mismo total sin conversión | Medio | Abierto |
+| R5 | **Suma de monedas**: ARS y USD se agregan en el mismo total sin conversión | Medio | Resuelto — totales separados por moneda (L2) + equivalente con cotización (P4) |
 | R6 | **Sin tests**: toda la lógica financiera (interés, amortización, mora) sin cobertura | Alto | Abierto |
 | R7 | **Duplicación de lógica**: el cálculo de cuotas existe en TS y en PL/pgSQL; pueden divergir | Medio | Abierto |
 | R8 | **Cumplimiento de stores**: falta eliminación de cuenta (Google Play) y política de privacidad publicada | Bloqueante para launch | Eliminación de cuenta en desarrollo (§ 5.1); política de privacidad todavía sin URL pública (hoy solo existe como texto in-app en Ajustes) |

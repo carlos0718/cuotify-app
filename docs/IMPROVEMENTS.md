@@ -291,14 +291,14 @@ faltaba pasar el dato que la query ya traía.
 **Fix correcto:** eliminar las 10 locales y dejar un único `<Money amount currency />`
 en `components/common/` (parte de A1), con una sola decisión de formato.
 
-### 🔴 L2 · Los totales del dashboard suman ARS + USD sin conversión
-`src/services/supabase/loans.ts:557-575` — `totalRecovered`, `totalPending` y
-`totalExpected` se calculan con `reduce` sobre todos los pagos, sin agrupar por
-`currency`. Un usuario con un préstamo de USD 1.000 y otro de ARS 500.000 ve
-"501.000" como total.
+### ✅ L2 · Los totales del dashboard suman ARS + USD sin conversión — Resuelto
+`src/services/supabase/loans.ts` — `getLoanStats` devuelve las stats agrupadas por
+moneda (`byCurrency: Record<CurrencyType, MoneyStats>`) y el dashboard renderiza una
+tarjeta por moneda. ARS y USD nunca se suman en un mismo número.
 
-**Fix:** devolver las stats agrupadas por moneda y que el dashboard muestre una tarjeta
-por moneda (o un selector). Nunca sumar monedas distintas, aunque haya cotización.
+**Fix aplicado:** stats por moneda (`byCurrency`) + una tarjeta por moneda en el
+dashboard. La **P4** agrega encima el equivalente con fecha de cotización (dolarapi.com),
+sin sumar monedas: la conversión es solo para mostrar.
 
 ```ts
 type StatsPorMoneda = Record<CurrencyType, { totalLent: number; totalRecovered: number; /* … */ }>;
@@ -835,7 +835,7 @@ ninguna respuesta táctil. `expo-haptics` es una línea de código.
 | P1 | **Registrar pago parcial** | El estado `partial` ya está en el schema sin UI. En préstamos informales el pago incompleto es la norma, no la excepción — hoy la app obliga a mentir (marcar todo o nada) |
 | P2 | **Recibo compartible por cuota** | Ya existe el PDF del cronograma; un recibo individual por cuota cobrada, compartible por WhatsApp, es el artefacto que hoy se manda a mano y le da valor al prestatario |
 | P3 | **Historial y score del prestatario** | Con los datos que ya se guardan: % de cuotas pagadas a tiempo, atraso promedio. Ayuda a decidir si volver a prestarle. Ya está anotado como TODO en `loans.ts:338` |
-| P4 | **Cotización ARS/USD** | Con dos monedas soportadas y una economía bimonetaria, mostrar el equivalente (con fecha de cotización) resuelve L2 de forma útil en vez de solo separar los totales |
+| P4 | **Cotización ARS/USD** *(en progreso)* | Con dos monedas soportadas y una economía bimonetaria, mostrar el equivalente (con fecha de cotización) complementa L2 (ya resuelto, totales separados): fuente en vivo dolarapi.com, tipo de dólar elegible (oficial/blue/MEP) en Ajustes, equivalente en dashboard y detalle |
 | P5 | **Onboarding en el primer uso** | La app abre en un dashboard vacío. Un flujo de 3 pantallas explicando préstamos vs deudas resolvería la confusión conceptual central del producto |
 | P6 | **Widget / notificación de "cobrar hoy"** | El caso de uso real es matutino: "a quién le cobro hoy". Un resumen diario o widget de home screen encaja perfecto con el modelo de datos que ya existe |
 | P7 | **Compartir cartera con un socio** | Prestar en pareja o entre socios es común; hoy el modelo asume un `lender_id` único |
