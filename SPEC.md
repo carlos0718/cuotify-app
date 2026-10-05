@@ -254,8 +254,9 @@ Leyenda: ✅ implementado · 🟡 implementado con deuda/limitación · ⏳ pend
 | `get_monthly_interest_earned` | RPC | `007_add_monthly_interest_rpc.sql` | Dashboard prestamista (§ 5.6, gráfico pendiente) |
 | `recalculate_overdue_penalties` | RPC + cron (`pg_cron`) | `013_add_penalty_cron.sql` | Cron diario (todos los préstamos) + refresco on-demand del detalle (un préstamo) — única fuente de verdad del cálculo de mora (§ 5.4, L7) |
 | `after_loan_insert` (trigger, no RPC invocable) | Trigger de DB | `001_initial_schema.sql` | Se dispara solo al insertar en `loans` |
-| `analyze-loans-document` | Edge Function (Deno) | `supabase/functions/analyze-loans-document/` | Importación de préstamos en lote con Gemini (§ 5.2) |
-| `analyze-credit-card` | Edge Function (Deno) | `supabase/functions/analyze-credit-card/` | Import de resumen de tarjeta con IA (§ 5.3) |
+| `increment_ai_usage` | RPC (`SECURITY DEFINER`) | `015_add_ai_usage_rate_limit.sql` | Rate limiting de los análisis con IA: incrementa el contador diario por usuario en `ai_analysis_usage` y señala si se superó el límite (S10) |
+| `analyze-loans-document` | Edge Function (Deno) | `supabase/functions/analyze-loans-document/` | Importación de préstamos en lote con Gemini (§ 5.2) — verifica el JWT, límite de 10 MB y rate limit diario vía `increment_ai_usage` (S9/S10) |
+| `analyze-credit-card` | Edge Function (Deno) | `supabase/functions/analyze-credit-card/` | Import de resumen de tarjeta con IA (§ 5.3) — mismas guardas de JWT, tamaño y rate limit (S9/S10) |
 | `send-payment-reminders` | Edge Function (Deno) | `supabase/functions/send-payment-reminders/` | Envío server-side de recordatorios (§ 5.5) — sin cron automático todavía |
 | `delete-account` | Edge Function (Deno) | `supabase/functions/delete-account/` | Botón "Eliminar cuenta" en Ajustes → Seguridad (§ 5.1) — verifica el JWT del usuario, borra sus objetos en Storage y llama `auth.admin.deleteUser` |
 

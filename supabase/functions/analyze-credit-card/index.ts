@@ -1,7 +1,18 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const GEMINI_MODEL = 'gemini-3.1-flash-lite';
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+// S10 (OWASP LLM10): topes para acotar el costo de Gemini.
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB de archivo (antes de base64)
+const DAILY_LIMIT = 30; // análisis por usuario por día
+
+// Tamaño real en bytes de un payload base64 (sin decodificarlo).
+function base64ByteSize(b64: string): number {
+  const padding = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
+  return Math.floor((b64.length * 3) / 4) - padding;
+}
 
 const ANALYSIS_PROMPT = `Sos un asistente especializado en analizar resúmenes de tarjeta de crédito argentinos.
 
@@ -121,11 +132,60 @@ serve(async (req) => {
       );
     }
 
+    // Identificar al usuario desde el JWT (nunca confiar en un user_id del body).
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Falta el header de autorización' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Sesión inválida o expirada' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { fileBase64, mimeType } = await req.json();
     if (!fileBase64 || !mimeType) {
       return new Response(
         JSON.stringify({ error: 'Se requieren fileBase64 y mimeType' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Límite de tamaño en el borde, antes de mandar nada a Gemini (S10).
+    if (base64ByteSize(fileBase64) > MAX_FILE_BYTES) {
+      return new Response(
+        JSON.stringify({ error: 'El archivo supera el tamaño máximo de 10 MB' }),
+        { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Rate limiting por usuario: incrementa el contador del día y corta con 429 si
+    // ya se alcanzó el límite, sin gastar una llamada a Gemini (S10).
+    const { data: usage, error: usageError } = await supabaseClient.rpc('increment_ai_usage', {
+      p_limit: DAILY_LIMIT,
+    });
+    if (usageError) {
+      return new Response(
+        JSON.stringify({ error: 'No se pudo verificar el límite de uso' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (usage === -1) {
+      return new Response(
+        JSON.stringify({ error: `Alcanzaste el límite de ${DAILY_LIMIT} análisis por día. Probá de nuevo mañana.` }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

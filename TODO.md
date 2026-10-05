@@ -158,7 +158,13 @@
       + cláusula anti-injection explícita + validación de rango programática con coerción
       numérica al sanitizar, como segunda capa que no depende del preview editable.
       Pendiente redeploy: `supabase functions deploy analyze-loans-document analyze-credit-card`)
-- [ ] 🔴 OWASP LLM10 · Rate limiting / límite de tamaño de archivo en las Edge Functions de análisis con IA — § S10
+- [x] 🔴 OWASP LLM10 · Rate limiting / límite de tamaño de archivo en las Edge Functions de análisis con IA — § S10
+      (ambas functions ahora: verifican el JWT del usuario —antes iban derecho a Gemini sin
+      identificarlo—, cortan con 413 si el archivo supera 10 MB, e incrementan un contador
+      diario por usuario vía la RPC `increment_ai_usage` —tabla `ai_analysis_usage`, migración
+      `015`— cortando con 429 al llegar a 30 análisis/día sin gastar una llamada a Gemini.
+      Pre-chequeo de 10 MB también en el cliente como UX. Pendiente aplicar/redeploy:
+      `supabase db push` + `supabase functions deploy analyze-loans-document analyze-credit-card`)
 
 ## Observabilidad
 
