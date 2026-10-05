@@ -18,6 +18,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 ### Removed
 
 ### Fixed
+- Marcar/revertir el pago de una cuota y la transición de estado del préstamo (completar / reactivar) no eran atómicos: se hacían en 3-4 round-trips sueltos desde el cliente, y un fallo intermedio dejaba el pago y el préstamo en estados inconsistentes — ahora ambos pasos ocurren en una sola transacción vía las RPC `mark_payment_paid` / `revert_payment` (L8). ⚠️ Requiere aplicar la migración `014_add_payment_transaction_rpcs.sql`
 - La mora solo se recalculaba al abrir la pantalla del préstamo (y `updateLoanPenalties`/`updatePaymentPenalty` eran código muerto, así que en la práctica no se persistía nunca) — ahora la calcula una función SQL (`recalculate_overdue_penalties`) que corre por cron diario sobre todos los pagos vencidos; el dashboard, el calendario y las notificaciones leen datos actualizados. Única fuente de verdad en SQL (L7). ⚠️ Requiere aplicar la migración `013_add_penalty_cron.sql`
 - Botón de mostrar/ocultar contraseña en `PasswordInput` sin `accessibilityLabel` ni `accessibilityRole` — un ícono SVG sin texto era invisible para VoiceOver/TalkBack (avance parcial de U1)
 

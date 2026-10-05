@@ -59,7 +59,13 @@
       el detalle muestra el `penalty_amount` persistido. La migración también amplió el trigger
       de S1 con un bypass de contexto de sistema (`auth.uid() IS NULL`) para que el cron/backfill
       no fueran bloqueados. Aplicada a la DB el 2026-10-03 vía `supabase db push`)
-- [ ] RPC transaccional `mark_payment_paid` / `revert_payment` — § L8
+- [x] RPC transaccional `mark_payment_paid` / `revert_payment` — § L8
+      (migración `014_add_payment_transaction_rpcs.sql`: dos funciones `plpgsql`
+      `SECURITY INVOKER` que hacen el update de la cuota + la transición de estado del
+      préstamo —completar / reactivar— en una sola transacción. `markPaymentAsPaid` y
+      `revertPaymentToPending` pasaron a wrappers de `supabase.rpc(...)`; antes eran 3-4
+      round-trips sueltos sin atomicidad. Tests del servicio adaptados al contrato de RPC.
+      Pendiente aplicar a la DB: `supabase db push` + `supabase gen types`)
 
 ## Auth e identidad
 

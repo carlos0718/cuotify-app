@@ -422,85 +422,26 @@ export async function getPaymentsByLoan(loanId: string): Promise<Payment[]> {
 }
 
 export async function markPaymentAsPaid(paymentId: string, paidAmount: number) {
-  // 1. Obtener el pago para saber el loan_id
-  const { data: payment, error: paymentError } = await supabase
-    .from('payments')
-    .select('loan_id')
-    .eq('id', paymentId)
-    .single();
-
-  if (paymentError) throw new Error(handleSupabaseError(paymentError));
-
-  const loanId = (payment as { loan_id: string }).loan_id;
-
-  // 2. Actualizar el pago
-  const { data, error } = await supabase
-    .from('payments')
-    .update({
-      status: 'paid',
-      paid_amount: paidAmount,
-      paid_date: new Date().toISOString().split('T')[0],
-    })
-    .eq('id', paymentId)
-    .select()
-    .single();
+  // RPC transaccional (L8): actualiza la cuota y, si todas quedan pagadas,
+  // completa el préstamo en una sola transacción. Ver migración 014.
+  const { data, error } = await supabase.rpc('mark_payment_paid', {
+    p_payment_id: paymentId,
+    p_paid_amount: paidAmount,
+  });
 
   if (error) throw new Error(handleSupabaseError(error));
-
-  // 3. Verificar si todos los pagos del préstamo están pagados
-  const { data: allPayments, error: allPaymentsError } = await supabase
-    .from('payments')
-    .select('status')
-    .eq('loan_id', loanId);
-
-  if (allPaymentsError) throw new Error(handleSupabaseError(allPaymentsError));
-
-  const paymentsList = (allPayments || []) as { status: string }[];
-  const allPaid = paymentsList.every(p => p.status === 'paid');
-
-  // 4. Si todos están pagados, actualizar el préstamo a 'completed'
-  if (allPaid) {
-    await supabase
-      .from('loans')
-      .update({ status: 'completed' })
-      .eq('id', loanId);
-  }
 
   return data;
 }
 
 export async function revertPaymentToPending(paymentId: string) {
-  // 1. Obtener el pago para saber el loan_id
-  const { data: payment, error: paymentError } = await supabase
-    .from('payments')
-    .select('loan_id')
-    .eq('id', paymentId)
-    .single();
-
-  if (paymentError) throw new Error(handleSupabaseError(paymentError));
-
-  const loanId = (payment as { loan_id: string }).loan_id;
-
-  // 2. Actualizar el pago a pendiente
-  const { data, error } = await supabase
-    .from('payments')
-    .update({
-      status: 'pending',
-      paid_amount: 0,
-      paid_date: null,
-    })
-    .eq('id', paymentId)
-    .select()
-    .single();
+  // RPC transaccional (L8): revierte la cuota a pendiente y reactiva el
+  // préstamo si estaba completado, de forma atómica. Ver migración 014.
+  const { data, error } = await supabase.rpc('revert_payment', {
+    p_payment_id: paymentId,
+  });
 
   if (error) throw new Error(handleSupabaseError(error));
-
-  // 3. Si el préstamo estaba completado, volver a estado activo
-  await supabase
-    .from('loans')
-    .update({ status: 'active' })
-    .eq('id', loanId)
-    .eq('status', 'completed');
 
   return data;
 }

@@ -600,9 +600,55 @@ export type Database = {
           year: number
         }[]
       }
+      mark_payment_paid: {
+        Args: { p_payment_id: string; p_paid_amount: number }
+        Returns: {
+          borrower_comment: string | null
+          borrower_comment_date: string | null
+          created_at: string | null
+          due_date: string
+          id: string
+          interest_portion: number
+          lender_note: string | null
+          loan_id: string
+          paid_amount: number | null
+          paid_date: string | null
+          payment_number: number
+          penalty_amount: number | null
+          penalty_calculated_at: string | null
+          principal_portion: number
+          remaining_balance: number
+          status: string | null
+          total_amount: number
+          updated_at: string | null
+        }
+      }
       recalculate_overdue_penalties: {
         Args: { p_loan_id?: string }
         Returns: undefined
+      }
+      revert_payment: {
+        Args: { p_payment_id: string }
+        Returns: {
+          borrower_comment: string | null
+          borrower_comment_date: string | null
+          created_at: string | null
+          due_date: string
+          id: string
+          interest_portion: number
+          lender_note: string | null
+          loan_id: string
+          paid_amount: number | null
+          paid_date: string | null
+          payment_number: number
+          penalty_amount: number | null
+          penalty_calculated_at: string | null
+          principal_portion: number
+          remaining_balance: number
+          status: string | null
+          total_amount: number
+          updated_at: string | null
+        }
       }
     }
     Enums: {
