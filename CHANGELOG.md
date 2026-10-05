@@ -9,6 +9,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 ## [Unreleased]
 
 ### Added
+- Cotización ARS/USD: el dashboard y el detalle de préstamo/deuda muestran el equivalente en la otra moneda con la fecha de cotización. Fuente en vivo (dolarapi.com) con caché y fallback offline; el tipo de dólar (oficial / blue / MEP) se elige en Ajustes → Cotización del dólar (P4)
 
 ### Changed
 

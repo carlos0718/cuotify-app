@@ -5,7 +5,7 @@ import { useAuthStore, usePreferencesStore, useSubscriptionStore } from '../stor
 import { useToast } from '../components';
 import { updateAllLoanColors } from '../services/supabase';
 import { colors } from '../theme';
-import { CurrencyType } from '../types';
+import { CurrencyType, DollarRateType } from '../types';
 
 // Información de contacto de soporte
 export const SUPPORT_EMAIL = 'soporte@cuotify.app';
@@ -13,12 +13,14 @@ const SUPPORT_WHATSAPP = '+5491112345678'; // Cambiar por el número real
 
 export function useSettingsHome() {
   const { profile, signOut } = useAuthStore();
-  const { defaultCurrency, setDefaultCurrency } = usePreferencesStore();
+  const { defaultCurrency, setDefaultCurrency, dollarRateType, setDollarRateType } =
+    usePreferencesStore();
   const { premium } = useSubscriptionStore();
   const { showSuccess, showError } = useToast();
 
   // Estados de modales
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [showDollarRateModal, setShowDollarRateModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showFAQModal, setShowFAQModal] = useState(false);
@@ -70,12 +72,20 @@ export function useSettingsHome() {
     setShowCurrencyModal(false);
   };
 
+  const handleSelectDollarRate = (type: DollarRateType) => {
+    setDollarRateType(type);
+    setShowDollarRateModal(false);
+  };
+
   return {
     profile,
     defaultCurrency,
+    dollarRateType,
     premium,
     showCurrencyModal,
     setShowCurrencyModal,
+    showDollarRateModal,
+    setShowDollarRateModal,
     showLogoutModal,
     setShowLogoutModal,
     showContactModal,
@@ -99,5 +109,6 @@ export function useSettingsHome() {
     handleContactWhatsApp,
     handleRateApp,
     handleSelectCurrency,
+    handleSelectDollarRate,
   };
 }

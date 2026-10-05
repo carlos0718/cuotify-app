@@ -5,10 +5,12 @@ import {
   generateAmortizationSchedule,
   calculateEndDate,
   formatCurrency,
+  convertCurrency,
   calculatePaymentProgress,
   calculateLatePenalty,
   formatPenaltyStatus,
 } from '../loanCalculator';
+import { ExchangeRate } from '../../../types';
 
 describe('calculateLoanPayment — sistema simple', () => {
   it('calcula interés fijo mensual (capital 1000, 12% anual, 12 cuotas)', () => {
@@ -423,5 +425,33 @@ describe('formatPenaltyStatus', () => {
       totalWithPenalty: 1050,
     });
     expect(status).toBe('Vencido hace 9 días - Mora: $50.00');
+  });
+});
+
+describe('convertCurrency', () => {
+  const rate: ExchangeRate = {
+    type: 'blue',
+    sell: 1000,
+    buy: 950,
+    date: '2026-10-05T12:00:00.000Z',
+    fetchedAt: '2026-10-05T12:00:00.000Z',
+  };
+
+  it('devuelve el mismo monto si las monedas son iguales', () => {
+    expect(convertCurrency(500, 'ARS', 'ARS', rate)).toBe(500);
+    expect(convertCurrency(500, 'USD', 'USD', rate)).toBe(500);
+  });
+
+  it('convierte USD a ARS multiplicando por la venta', () => {
+    expect(convertCurrency(10, 'USD', 'ARS', rate)).toBe(10000);
+  });
+
+  it('convierte ARS a USD dividiendo por la venta', () => {
+    expect(convertCurrency(10000, 'ARS', 'USD', rate)).toBe(10);
+  });
+
+  it('redondea a 2 decimales', () => {
+    // 100 / 1000 = 0.1; 333 / 1000 = 0.333 -> 0.33
+    expect(convertCurrency(333, 'ARS', 'USD', rate)).toBe(0.33);
   });
 });

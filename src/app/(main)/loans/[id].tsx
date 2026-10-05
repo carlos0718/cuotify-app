@@ -1,10 +1,10 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Modal as RNModal, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { Modal } from '../../../components';
+import { Modal, CurrencyEquivalent } from '../../../components';
 import { colors, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
-import { Payment, LatePenaltyType } from '../../../types';
-import { useLoanDetail, PaymentStatus } from '../../../hooks';
+import { Payment, LatePenaltyType, CurrencyType } from '../../../types';
+import { useLoanDetail, PaymentStatus, useExchangeRate } from '../../../hooks';
 
 // Componente de item de pago
 function PaymentItem({
@@ -129,6 +129,8 @@ export default function LoanDetailScreen() {
     formatDate,
   } = useLoanDetail(id, isReadOnly);
 
+  const exchange = useExchangeRate();
+
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]} edges={['top']}>
@@ -241,6 +243,12 @@ export default function LoanDetailScreen() {
                 {formatCurrency(loan.total_amount)}
               </Text>
             </View>
+            <CurrencyEquivalent
+              amount={loan.total_amount}
+              currency={(loan.currency || 'ARS') as CurrencyType}
+              exchange={exchange}
+              style={styles.equivalentLine}
+            />
           </View>
 
           {/* Creado por */}
@@ -555,6 +563,10 @@ const styles = StyleSheet.create({
   detailValueHighlight: {
     color: colors.primary.main,
     fontWeight: fontWeight.bold,
+  },
+  equivalentLine: {
+    textAlign: 'right',
+    marginTop: spacing.xs,
   },
   datesSection: {
     flexDirection: 'row',

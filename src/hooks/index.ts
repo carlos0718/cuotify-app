@@ -30,4 +30,6 @@ export { useDebtDetail } from './useDebtDetail';
 export type { DebtPaymentStatus, SelectedDebtPayment } from './useDebtDetail';
 export { useCreateDebtForm } from './useCreateDebtForm';
 export { useAppBootstrap } from './useAppBootstrap';
+export { useExchangeRate } from './useExchangeRate';
+export type { UseExchangeRate } from './useExchangeRate';
 export type { LoanDetail, PaymentStatus, SelectedPayment } from './useLoanDetail';

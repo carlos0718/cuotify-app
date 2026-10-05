@@ -5,7 +5,8 @@ import { router } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { useAuthStore } from '../../../store';
 import { colors, gradients, spacing, borderRadius, fontSize, fontWeight, shadow } from '../../../theme';
-import { useDashboardData, formatShortCurrency, LoanWithBorrower } from '../../../hooks';
+import { useDashboardData, formatShortCurrency, LoanWithBorrower, useExchangeRate } from '../../../hooks';
+import { CurrencyEquivalent } from '../../../components';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -212,6 +213,8 @@ export default function DashboardScreen() {
     getCurrentMonth,
   } = useDashboardData();
 
+  const exchange = useExchangeRate();
+
   const loanColors = [colors.primary.main, colors.secondary.main, '#14B8A6', '#F59E0B'];
 
   if (isLoading) {
@@ -315,16 +318,23 @@ export default function DashboardScreen() {
         {/* Estadísticas de préstamos - Solo si es prestamista */}
         {isLender() && (
           <View style={styles.statsSection}>
-            {/* Por cobrar - una tarjeta por moneda (L2) */}
+            {/* Por cobrar - una tarjeta por moneda (L2), con equivalente en la otra (P4) */}
             {lenderCurrencies.map((currency) => (
-              <StatCard
-                key={currency}
-                title={lenderCurrencies.length > 1 ? `Por cobrar en ${currency}` : 'Por cobrar'}
-                value={formatCurrency(stats.byCurrency[currency].totalPending, currency)}
-                icon="$"
-                variant="primary"
-                fullWidth
-              />
+              <View key={currency}>
+                <StatCard
+                  title={lenderCurrencies.length > 1 ? `Por cobrar en ${currency}` : 'Por cobrar'}
+                  value={formatCurrency(stats.byCurrency[currency].totalPending, currency)}
+                  icon="$"
+                  variant="primary"
+                  fullWidth
+                />
+                <CurrencyEquivalent
+                  amount={stats.byCurrency[currency].totalPending}
+                  currency={currency}
+                  exchange={exchange}
+                  style={styles.equivalentLine}
+                />
+              </View>
             ))}
             {/* Préstamos activos y Completados - Side by side */}
             <View style={styles.statsRow}>
@@ -388,6 +398,12 @@ export default function DashboardScreen() {
                         <Text style={[styles.debtsSummaryValue, { color: colors.error }]}>
                           {formatCurrency(money.remainingToPay, currency)}
                         </Text>
+                        <CurrencyEquivalent
+                          amount={money.remainingToPay}
+                          currency={currency}
+                          exchange={exchange}
+                          style={styles.equivalentLine}
+                        />
                       </View>
                     </View>
                     <View style={styles.debtsProgressContainer}>
@@ -646,6 +662,10 @@ const styles = StyleSheet.create({
   },
   statCardFullWidth: {
     paddingVertical: spacing.lg,
+  },
+  equivalentLine: {
+    marginTop: spacing.xs,
+    marginLeft: spacing.xs,
   },
   statIcon: {
     width: 44,

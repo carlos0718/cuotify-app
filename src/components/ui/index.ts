@@ -6,3 +6,5 @@ export { Modal } from './Modal';
 export { PhoneInput } from './PhoneInput';
 export { ErrorFallback } from './ErrorFallback';
 export type { ErrorFallbackProps } from './ErrorFallback';
+export { CurrencyEquivalent } from './CurrencyEquivalent';
+export type { CurrencyEquivalentProps } from './CurrencyEquivalent';

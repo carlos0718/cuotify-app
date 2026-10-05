@@ -21,6 +21,18 @@ export type LatePenaltyType = 'none' | 'fixed' | 'daily' | 'weekly';
 // Tipo de moneda
 export type CurrencyType = 'ARS' | 'USD';
 
+// Tipo de cotización del dólar (P4) — el usuario elige cuál usar para convertir
+export type DollarRateType = 'oficial' | 'blue' | 'mep';
+
+// Cotización ARS/USD obtenida de dolarapi.com (valor de red, no entidad de DB)
+export interface ExchangeRate {
+  type: DollarRateType;
+  buy: number;          // compra (ARS por 1 USD)
+  sell: number;         // venta (ARS por 1 USD)
+  date: string;         // ISO date de la última actualización de la cotización
+  fetchedAt: string;    // ISO date del momento en que la app la trajo/cacheó
+}
+
 // Tipo para cálculo de préstamo
 export interface LoanCalculationInput {
   principalAmount: number;
