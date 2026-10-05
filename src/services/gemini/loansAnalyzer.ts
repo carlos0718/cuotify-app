@@ -1,5 +1,5 @@
 import { supabase } from '../supabase/client';
-import { getMimeType } from './creditCardAnalyzer';
+import { getMimeType, base64ByteSize, MAX_FILE_BYTES } from './creditCardAnalyzer';
 
 export interface LoanItem {
   borrower_name: string;
@@ -29,6 +29,10 @@ async function fileUriToBase64(uri: string): Promise<string> {
 export async function analyzeLoanDocument(fileUri: string): Promise<LoanItem[]> {
   const mimeType = getMimeType(fileUri);
   const fileBase64 = await fileUriToBase64(fileUri);
+
+  if (base64ByteSize(fileBase64) > MAX_FILE_BYTES) {
+    throw new Error('El archivo supera el tamaño máximo de 10 MB');
+  }
 
   const { data, error } = await supabase.functions.invoke('analyze-loans-document', {
     body: { fileBase64, mimeType },

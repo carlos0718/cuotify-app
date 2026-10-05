@@ -27,6 +27,17 @@ export function getMimeType(uri: string): string {
   return MIME_TYPES[ext] ?? 'application/octet-stream';
 }
 
+// Pre-chequeo de tamaño del lado del cliente (S10): corta antes de subir el base64
+// si ya se sabe que supera el tope. El borde (Edge Function) lo vuelve a validar;
+// esto es solo UX para no gastar ancho de banda ni tiempo en un archivo que será
+// rechazado. Debe quedar alineado con MAX_FILE_BYTES de las Edge Functions.
+export const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+export function base64ByteSize(b64: string): number {
+  const padding = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
+  return Math.floor((b64.length * 3) / 4) - padding;
+}
+
 async function fileUriToBase64(uri: string): Promise<string> {
   const response = await fetch(uri);
   const buffer = await response.arrayBuffer();
@@ -47,6 +58,10 @@ export interface AnalysisResult {
 export async function analyzeCreditCardReceipt(fileUri: string): Promise<AnalysisResult> {
   const mimeType = getMimeType(fileUri);
   const fileBase64 = await fileUriToBase64(fileUri);
+
+  if (base64ByteSize(fileBase64) > MAX_FILE_BYTES) {
+    throw new Error('El archivo supera el tamaño máximo de 10 MB');
+  }
 
   const { data, error } = await supabase.functions.invoke('analyze-credit-card', {
     body: { fileBase64, mimeType },
