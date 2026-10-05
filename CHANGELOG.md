@@ -23,6 +23,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 - Botón de mostrar/ocultar contraseña en `PasswordInput` sin `accessibilityLabel` ni `accessibilityRole` — un ícono SVG sin texto era invisible para VoiceOver/TalkBack (avance parcial de U1)
 
 ### Security
+- Guarda contra prompt injection en las Edge Functions de análisis con IA (`analyze-loans-document`, `analyze-credit-card`): el prompt de extracción pasó a `system_instruction` de Gemini —separando las instrucciones del documento no confiable, que antes iba al mismo nivel que el prompt—, se agregó una cláusula explícita que marca el contenido del archivo como datos y no órdenes, y una validación de rango programática (con coerción numérica) que descarta valores absurdos al sanitizar, como segunda capa independiente del preview editable (S9, OWASP LLM01). ⚠️ Requiere redeploy de ambas Edge Functions
 
 ## [1.1.0] - 2026-09-12
 
