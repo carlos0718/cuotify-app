@@ -30,6 +30,8 @@ export function useExchangeRate(): UseExchangeRate {
 
   useEffect(() => {
     let active = true;
+    // Marca la recarga al cambiar `type`; el flag tiene que subir antes del fetch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
 
     getExchangeRate(type)

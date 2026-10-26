@@ -33,7 +33,7 @@ npm test            # jest (preset jest-expo)
 
 ## Stack
 
-React Native + Expo (SDK 57) · Expo Router · Supabase (Postgres + Auth + Edge Functions) ·
+React Native + Expo (SDK 58) · Expo Router · Supabase (Postgres + Auth + Edge Functions) ·
 Zustand · React Hook Form + Zod · RevenueCat · Gemini (análisis de documentos por IA) · Jest
 (`jest-expo`). Ver `AGENTS.md` para el detalle completo y el *por qué* de cada elección.
 
