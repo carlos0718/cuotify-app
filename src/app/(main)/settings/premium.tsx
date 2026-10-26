@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  type ScrollViewInstance,
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
@@ -77,7 +78,7 @@ function CustomPaywall() {
     handlePurchase,
     handleRestore,
   } = useCustomPaywall();
-  const slideRef = useRef<ScrollView>(null);
+  const slideRef = useRef<ScrollViewInstance>(null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>

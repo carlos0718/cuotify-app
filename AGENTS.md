@@ -8,7 +8,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Stack
 
-- **Frontend**: React Native + Expo (SDK 57), Expo Router (file-based navigation)
+- **Frontend**: React Native + Expo (SDK 58), Expo Router (file-based navigation)
 - **Backend**: Supabase (Postgres + Auth + Edge Functions en Deno)
 - **ORM / DB**: Supabase JS client directo sobre Postgres, con Row Level Security — sin ORM aparte
 - **Estilos**: Design tokens en `src/theme/` (colors, gradients, typography, spacing, borderRadius, shadow) — sin styled-components ni librería de UI
