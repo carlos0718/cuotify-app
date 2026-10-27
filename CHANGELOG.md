@@ -20,6 +20,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/), y 
 ### Fixed
 
 ### Security
+- Dependencias: `npm audit fix` baja de 12 a 5 las vulnerabilidades (se resuelve la crítica de `shell-quote`). Las 5 restantes son de herramientas de build de Expo y no tienen parche sin bajar de SDK — riesgo aceptado y documentado (S11)
 
 ## [1.2.0] - 2026-10-05
 

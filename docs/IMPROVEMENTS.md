@@ -246,6 +246,19 @@ por usuario en la Edge Function (ej. N análisis por día, usando una tabla de c
 `pg_cron` para resetear) — podría combinarse con el límite de plan free/Pro que ya existe
 para préstamos/deudas (`FREE_LIMITS`).
 
+### 🟡 S11 · `npm audit`: 5 vulnerabilidades altas sin parche en SDK 58 (riesgo aceptado)
+Tras actualizar a SDK 58 `npm audit` reportaba 12 vulnerabilidades (1 crítica). `npm audit fix`
+(sin `--force`) resolvió 7, incluida la crítica (`shell-quote`), y quedan 5 de severidad alta,
+todas en la cadena `expo` → `@expo/cli` (`zod` 3.x interno) y `@expo/code-signing-certificates`
+→ `node-forge`. Son herramientas de build/CLI de Expo: no se empaquetan en la app que corre en
+el teléfono.
+
+`npm audit fix --force` propone `expo@54.0.38`, es decir, **bajar** de SDK 58 a 54 — una
+regresión, no un fix, así que no se aplica.
+
+**Estado:** riesgo aceptado hasta que Expo publique una versión de `@expo/cli` con las
+dependencias parcheadas. **Revisar** con `npm audit` en cada bump de SDK y antes de releases.
+
 ---
 
 ## 2. Lógica de negocio y corrección de datos
